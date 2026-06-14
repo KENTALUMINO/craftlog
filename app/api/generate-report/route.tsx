@@ -62,58 +62,81 @@ export async function POST(req: NextRequest) {
       ...Object.keys(grouped).filter(p => !phaseOrder.includes(p)),
     ]
 
+    // 工程ごとに6枚ずつのページを生成
+    type PhotoPage = { phase: string; photos: typeof photos; pageNum: number; totalPages: number }
+    const photoPages: PhotoPage[] = []
+    for (const phase of orderedPhases) {
+      const phasePhotos = grouped[phase]
+      const chunks: (typeof photos)[] = []
+      for (let i = 0; i < phasePhotos.length; i += 6) chunks.push(phasePhotos.slice(i, i + 6))
+      chunks.forEach((chunk, idx) => {
+        photoPages.push({ phase, photos: chunk, pageNum: idx + 1, totalPages: chunks.length })
+      })
+    }
+
     // PDF生成
     const pdfBuffer = await renderToBuffer(
       <Document>
+        {/* 表紙ページ */}
         <Page size="A4" style={styles.page}>
-          {/* 表紙 */}
-          <View style={styles.titleBox}>
-            <Text style={styles.title}>完工報告書</Text>
-            <Text style={styles.caseName}>{project.case_name}</Text>
-            <Text style={styles.subText}>{project.work_type}</Text>
-            {project.start_date && (
-              <Text style={styles.subText}>工事期間：{project.start_date} 〜 {project.end_date || '未定'}</Text>
-            )}
-          </View>
+          <View style={{ flex: 1, justifyContent: 'center' }}>
+            <View style={styles.titleBox}>
+              <Text style={styles.title}>完工報告書</Text>
+              <Text style={styles.caseName}>{project.case_name}</Text>
+              <Text style={styles.subText}>{project.work_type}</Text>
+              {project.start_date && (
+                <Text style={styles.subText}>工事期間：{project.start_date} 〜 {project.end_date || '未定'}</Text>
+              )}
+            </View>
 
-          {/* 工事概要 */}
-          <Text style={styles.sectionTitle}>工事概要</Text>
-          <View style={styles.table}>
-            <View style={styles.tableRow}>
-              <Text style={styles.tableLabel}>現場名</Text>
-              <Text style={styles.tableValue}>{project.case_name}</Text>
-            </View>
-            <View style={styles.tableRow}>
-              <Text style={styles.tableLabel}>工事種類</Text>
-              <Text style={styles.tableValue}>{project.work_type}</Text>
-            </View>
-            <View style={styles.tableRow}>
-              <Text style={styles.tableLabel}>施工地域</Text>
-              <Text style={styles.tableValue}>{project.area}</Text>
-            </View>
-            {project.start_date && (
+            <Text style={[styles.sectionTitle, { marginTop: 40 }]}>工事概要</Text>
+            <View style={styles.table}>
               <View style={styles.tableRow}>
-                <Text style={styles.tableLabel}>工事期間</Text>
-                <Text style={styles.tableValue}>{project.start_date} 〜 {project.end_date || '未定'}</Text>
+                <Text style={styles.tableLabel}>現場名</Text>
+                <Text style={styles.tableValue}>{project.case_name}</Text>
               </View>
-            )}
-          </View>
-
-          {/* 施工写真 */}
-          <Text style={styles.sectionTitle}>施工写真</Text>
-          {orderedPhases.map((phase) => (
-            <View key={phase} wrap={false}>
-              <Text style={styles.phaseTitle}>{phase}（{grouped[phase].length}枚）</Text>
-              <View style={styles.photoGrid}>
-                {grouped[phase].slice(0, 6).map((p) => (
-                  <Image key={p.id} src={getUrl(p.storage_path)} style={styles.photo} />
-                ))}
+              <View style={styles.tableRow}>
+                <Text style={styles.tableLabel}>工事種類</Text>
+                <Text style={styles.tableValue}>{project.work_type}</Text>
+              </View>
+              <View style={styles.tableRow}>
+                <Text style={styles.tableLabel}>施工地域</Text>
+                <Text style={styles.tableValue}>{project.area}</Text>
+              </View>
+              {project.start_date && (
+                <View style={styles.tableRow}>
+                  <Text style={styles.tableLabel}>工事期間</Text>
+                  <Text style={styles.tableValue}>{project.start_date} 〜 {project.end_date || '未定'}</Text>
+                </View>
+              )}
+              <View style={styles.tableRow}>
+                <Text style={styles.tableLabel}>工程数</Text>
+                <Text style={styles.tableValue}>{orderedPhases.length}工程</Text>
+              </View>
+              <View style={styles.tableRow}>
+                <Text style={styles.tableLabel}>写真枚数</Text>
+                <Text style={styles.tableValue}>{photos.length}枚</Text>
               </View>
             </View>
-          ))}
-
+          </View>
           <Text style={styles.footer}>本書は CraftLog により自動生成されました</Text>
         </Page>
+
+        {/* 施工写真ページ（工程ごと・6枚ずつ） */}
+        {photoPages.map((pp, i) => (
+          <Page key={i} size="A4" style={styles.page}>
+            <Text style={styles.sectionTitle}>施工写真</Text>
+            <Text style={styles.phaseTitle}>
+              {pp.phase}（{pp.totalPages > 1 ? `${pp.pageNum}/${pp.totalPages} ` : ''}{grouped[pp.phase].length}枚）
+            </Text>
+            <View style={styles.photoGrid}>
+              {pp.photos.map((p) => (
+                <Image key={p.id} src={getUrl(p.storage_path)} style={styles.photo} />
+              ))}
+            </View>
+            <Text style={styles.footer}>本書は CraftLog により自動生成されました</Text>
+          </Page>
+        ))}
       </Document>
     )
 
