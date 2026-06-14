@@ -29,6 +29,8 @@ export default function ProjectPage() {
   const [photos, setPhotos] = useState<Photo[]>([])
   const [uploading, setUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
+  const [generating, setGenerating] = useState(false)
+  const [reportSent, setReportSent] = useState(false)
 
   // 工程入力モード
   const [pendingPhotos, setPendingPhotos] = useState<Photo[]>([])
@@ -130,6 +132,20 @@ export default function ProjectPage() {
     fetchPhotos()
   }
 
+  const handleGenerateReport = async () => {
+    setGenerating(true)
+    setReportSent(false)
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    const res = await fetch('/api/generate-report', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ projectId: id, userEmail: user.email }),
+    })
+    setGenerating(false)
+    if (res.ok) setReportSent(true)
+  }
+
   const groupedPhotos = photos.reduce((acc, photo) => {
     const phase = photo.phase || '未分類'
     if (!acc[phase]) acc[phase] = []
@@ -221,6 +237,25 @@ export default function ProjectPage() {
                 </button>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* 完工報告書ボタン */}
+        {photos.length > 0 && (
+          <div className="mb-4">
+            {reportSent ? (
+              <div className="bg-green-50 text-green-700 rounded-xl py-4 text-center text-sm font-medium">
+                ✓ 完工報告書をメールで送信しました
+              </div>
+            ) : (
+              <button
+                onClick={handleGenerateReport}
+                disabled={generating}
+                className="w-full bg-gray-900 text-white rounded-xl py-4 text-sm font-medium disabled:opacity-50"
+              >
+                {generating ? '生成中...' : '完工報告書を生成・送信'}
+              </button>
+            )}
           </div>
         )}
 
