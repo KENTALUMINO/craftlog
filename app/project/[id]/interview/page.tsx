@@ -12,6 +12,8 @@ export default function InterviewPage() {
   const id = params.id as string
   const router = useRouter()
 
+  const STEPS = ['工程管理', '並び替え', '完工報告書', 'ブログ']
+
   const [project, setProject] = useState<Project | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
@@ -113,12 +115,29 @@ export default function InterviewPage() {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       <header className="bg-white border-b border-gray-100 px-4 py-4 flex items-center gap-3 flex-shrink-0">
-        <button onClick={() => router.push(`/project/${id}`)} className="text-gray-400 hover:text-gray-600 text-lg">←</button>
+        <button onClick={() => router.push(`/project/${id}/report`)} className="text-gray-400 hover:text-gray-600 text-lg">←</button>
         <div>
-          <h1 className="text-base font-bold text-gray-900">施工事例インタビュー</h1>
-          <p className="text-xs text-gray-500">{project.case_name}　{project.work_type}</p>
+          <h1 className="text-base font-bold text-gray-900">{project.case_name}</h1>
+          <p className="text-xs text-gray-500">{project.work_type}　{project.area}</p>
         </div>
       </header>
+
+      {/* ステップバー */}
+      <div className="bg-white border-b border-gray-100 px-4 py-3 flex-shrink-0">
+        <div className="flex items-center max-w-2xl mx-auto">
+          {STEPS.map((step, i) => (
+            <div key={step} className="flex items-center flex-1">
+              <div className={`flex items-center gap-1.5 ${i === 3 ? 'text-blue-600' : i < 3 ? 'text-green-500' : 'text-gray-300'}`}>
+                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${i === 3 ? 'bg-blue-600 text-white' : i < 3 ? 'bg-green-500 text-white' : 'bg-gray-100 text-gray-400'}`}>
+                  {i < 3 ? '✓' : i + 1}
+                </div>
+                <span className="text-xs font-medium hidden sm:block">{step}</span>
+              </div>
+              {i < STEPS.length - 1 && <div className="flex-1 h-px bg-gray-200 mx-2" />}
+            </div>
+          ))}
+        </div>
+      </div>
 
       {/* チャット */}
       <div className="flex-1 overflow-y-auto px-4 py-6 space-y-4 max-w-lg mx-auto w-full">
