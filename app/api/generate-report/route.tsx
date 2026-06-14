@@ -2,6 +2,15 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { Resend } from 'resend'
 import { renderToBuffer, Document, Page, Text, View, Image, StyleSheet, Font } from '@react-pdf/renderer'
+import path from 'path'
+
+Font.register({
+  family: 'NotoSansJP',
+  fonts: [
+    { src: path.join(process.cwd(), 'public/fonts/NotoSansJP-Regular.ttf'), fontWeight: 'normal' },
+    { src: path.join(process.cwd(), 'public/fonts/NotoSansJP-Bold.ttf'), fontWeight: 'bold' },
+  ],
+})
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -11,12 +20,12 @@ const supabase = createClient(
 const resend = new Resend(process.env.RESEND_API_KEY)
 
 const styles = StyleSheet.create({
-  page: { padding: 40, fontFamily: 'Helvetica', backgroundColor: '#ffffff' },
+  page: { padding: 40, fontFamily: 'NotoSansJP', backgroundColor: '#ffffff' },
   titleBox: { border: '2pt solid #1f2a44', padding: 30, marginBottom: 30, alignItems: 'center' },
-  title: { fontSize: 28, fontFamily: 'Helvetica-Bold', color: '#1f2a44', marginBottom: 12 },
-  caseName: { fontSize: 16, fontFamily: 'Helvetica-Bold', marginBottom: 6 },
+  title: { fontSize: 28, fontFamily: 'NotoSansJP', fontWeight: 'bold', color: '#1f2a44', marginBottom: 12 },
+  caseName: { fontSize: 16, fontFamily: 'NotoSansJP', fontWeight: 'bold', marginBottom: 6 },
   subText: { fontSize: 11, color: '#666666', marginBottom: 4 },
-  sectionTitle: { fontSize: 14, fontFamily: 'Helvetica-Bold', color: '#1f2a44', borderBottom: '2pt solid #1f2a44', paddingBottom: 6, marginBottom: 12, marginTop: 20 },
+  sectionTitle: { fontSize: 14, fontFamily: 'NotoSansJP', fontWeight: 'bold', color: '#1f2a44', borderBottom: '2pt solid #1f2a44', paddingBottom: 6, marginBottom: 12, marginTop: 20 },
   table: { marginBottom: 20 },
   tableRow: { flexDirection: 'row', borderBottom: '1pt solid #dddddd' },
   tableLabel: { width: '30%', backgroundColor: '#f5f5f5', padding: 8, fontSize: 10, color: '#555555' },
