@@ -102,7 +102,7 @@ export default function DashboardPage() {
                     type="text"
                     value={form.case_name}
                     onChange={e => setForm({ ...form, case_name: e.target.value })}
-                    className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="例：山田様邸"
                     required
                   />
@@ -113,7 +113,7 @@ export default function DashboardPage() {
                     type="text"
                     value={form.work_type}
                     onChange={e => setForm({ ...form, work_type: e.target.value })}
-                    className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="例：屋根工事"
                     required
                   />
@@ -124,7 +124,7 @@ export default function DashboardPage() {
                     type="text"
                     value={form.area}
                     onChange={e => setForm({ ...form, area: e.target.value })}
-                    className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="例：平塚市"
                     required
                   />
@@ -136,7 +136,7 @@ export default function DashboardPage() {
                       type="date"
                       value={form.start_date}
                       onChange={e => setForm({ ...form, start_date: e.target.value })}
-                      className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
                   <div className="flex-1">
@@ -145,7 +145,7 @@ export default function DashboardPage() {
                       type="date"
                       value={form.end_date}
                       onChange={e => setForm({ ...form, end_date: e.target.value })}
-                      className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
                 </div>
