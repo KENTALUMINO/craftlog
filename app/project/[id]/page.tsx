@@ -114,26 +114,41 @@ export default function ProjectPage() {
 
     if (fileInputRef.current) fileInputRef.current.value = ''
 
-    // 黒板OCRで工程名を自動検出
-    let detectedPhase = ''
-    if (uploaded.length > 0 && uploaded[0].url) {
-      setOcrLoading(true)
+    // 各写真を個別にOCRして工程名を自動セット
+    setOcrLoading(true)
+    const autoDetected: Photo[] = []
+    const needsManual: Photo[] = []
+
+    for (const photo of uploaded) {
+      if (!photo.url) { needsManual.push(photo); continue }
       try {
         const ocrRes = await fetch('/api/ocr-phase', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ imageUrl: uploaded[0].url }),
+          body: JSON.stringify({ imageUrl: photo.url }),
         })
         const ocrData = await ocrRes.json()
-        if (ocrData.phase) detectedPhase = ocrData.phase
-      } catch {}
-      setOcrLoading(false)
+        if (ocrData.phase) {
+          await supabase.from('photos').update({ phase: ocrData.phase }).eq('id', photo.id)
+          autoDetected.push({ ...photo, phase: ocrData.phase })
+        } else {
+          needsManual.push(photo)
+        }
+      } catch {
+        needsManual.push(photo)
+      }
     }
 
-    // 工程入力モードへ
-    setPendingPhotos(uploaded)
-    setShowPhaseInput(true)
-    setPhaseInput(detectedPhase)
+    setOcrLoading(false)
+
+    // 工程名が検出できなかった写真だけ手動入力モードへ
+    if (needsManual.length > 0) {
+      setPendingPhotos(needsManual)
+      setShowPhaseInput(true)
+      setPhaseInput('')
+    }
+
+    fetchPhotos()
   }
 
   const handleAssignPhase = async (phase: string) => {
