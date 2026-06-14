@@ -139,7 +139,7 @@ export default function InterviewPage() {
                 </div>
               </div>
               {isLastAssistant && !isDone && (
-                <p className="text-xs text-gray-300 mt-2 ml-10">{getPlaceholder()}</p>
+                <p className="text-xs text-gray-400 mt-2 ml-10">{getPlaceholder()}</p>
               )}
             </div>
           )
