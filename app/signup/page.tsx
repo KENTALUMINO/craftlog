@@ -76,6 +76,12 @@ export default function SignupPage() {
           >
             {loading ? '登録中...' : 'アカウントを作成'}
           </button>
+
+          <div className="bg-yellow-50 border border-yellow-100 rounded-lg px-4 py-3 text-xs text-yellow-800 leading-relaxed">
+            登録後に確認メールが届きます。メール内のリンクをクリックしてからログインしてください。
+            <br />
+            <span className="font-medium">メールが届かない場合</span>は迷惑メールフォルダをご確認ください。
+          </div>
         </form>
 
         <p className="text-center text-sm text-gray-500 mt-6">
