@@ -31,6 +31,7 @@ export default function ProjectPage() {
   const [uploadProgress, setUploadProgress] = useState(0)
   const [generating, setGenerating] = useState(false)
   const [reportSent, setReportSent] = useState(false)
+  const [ocrLoading, setOcrLoading] = useState(false)
 
   // 工程入力モード
   const [pendingPhotos, setPendingPhotos] = useState<Photo[]>([])
@@ -113,10 +114,26 @@ export default function ProjectPage() {
 
     if (fileInputRef.current) fileInputRef.current.value = ''
 
+    // 黒板OCRで工程名を自動検出
+    let detectedPhase = ''
+    if (uploaded.length > 0 && uploaded[0].url) {
+      setOcrLoading(true)
+      try {
+        const ocrRes = await fetch('/api/ocr-phase', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ imageUrl: uploaded[0].url }),
+        })
+        const ocrData = await ocrRes.json()
+        if (ocrData.phase) detectedPhase = ocrData.phase
+      } catch {}
+      setOcrLoading(false)
+    }
+
     // 工程入力モードへ
     setPendingPhotos(uploaded)
     setShowPhaseInput(true)
-    setPhaseInput('')
+    setPhaseInput(detectedPhase)
   }
 
   const handleAssignPhase = async (phase: string) => {
@@ -172,6 +189,14 @@ export default function ProjectPage() {
       <main className="max-w-2xl mx-auto px-4 py-6">
 
         {/* 工程入力モーダル */}
+        {ocrLoading && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-2xl px-8 py-6 text-center">
+              <p className="text-sm text-gray-600">🔍 黒板を読み取り中...</p>
+            </div>
+          </div>
+        )}
+
         {showPhaseInput && (
           <div className="fixed inset-0 bg-black/50 flex items-end justify-center z-50 p-4">
             <div className="bg-white rounded-2xl w-full max-w-md p-6">
@@ -211,6 +236,9 @@ export default function ProjectPage() {
               )}
 
               {/* 新しい工程名 */}
+              {phaseInput && (
+                <p className="text-xs text-indigo-500 mb-1">🔍 黒板から自動検出しました。修正もできます。</p>
+              )}
               <input
                 type="text"
                 value={phaseInput}
