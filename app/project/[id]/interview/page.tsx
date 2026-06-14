@@ -122,20 +122,28 @@ export default function InterviewPage() {
 
       {/* チャット */}
       <div className="flex-1 overflow-y-auto px-4 py-6 space-y-4 max-w-lg mx-auto w-full">
-        {messages.map((m, i) => (
-          <div key={i} className={`flex gap-2 ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-            {m.role === 'assistant' && (
-              <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-xs flex-shrink-0 mt-1">AI</div>
-            )}
-            <div className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-7 whitespace-pre-wrap break-words ${
-              m.role === 'user'
-                ? 'bg-blue-600 text-white rounded-br-sm'
-                : 'bg-white border border-gray-100 text-gray-800 rounded-bl-sm'
-            }`}>
-              {m.content}
+        {messages.map((m, i) => {
+          const isLastAssistant = m.role === 'assistant' && i === messages.length - 1
+          return (
+            <div key={i}>
+              <div className={`flex gap-2 ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                {m.role === 'assistant' && (
+                  <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-xs flex-shrink-0 mt-1">AI</div>
+                )}
+                <div className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-7 whitespace-pre-wrap break-words ${
+                  m.role === 'user'
+                    ? 'bg-blue-600 text-white rounded-br-sm'
+                    : 'bg-white border border-gray-100 text-gray-800 rounded-bl-sm'
+                }`}>
+                  {m.content}
+                </div>
+              </div>
+              {isLastAssistant && !isDone && (
+                <p className="text-xs text-gray-300 mt-2 ml-10">{getPlaceholder()}</p>
+              )}
             </div>
-          </div>
-        ))}
+          )
+        })}
 
         {loading && (
           <div className="flex justify-start">
@@ -186,7 +194,7 @@ export default function InterviewPage() {
             onChange={e => setInput(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleSend()}
             className="flex-1 border border-gray-200 rounded-xl px-3 py-3 text-base text-gray-900 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder={getPlaceholder()}
+            placeholder="回答を入力..."
             disabled={loading}
             style={{ fontSize: '16px' }}
           />
