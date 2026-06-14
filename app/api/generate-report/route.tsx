@@ -1,0 +1,128 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
+import { Resend } from 'resend'
+import { renderToBuffer, Document, Page, Text, View, Image, StyleSheet, Font } from '@react-pdf/renderer'
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SECRET_KEY!
+)
+
+const resend = new Resend(process.env.RESEND_API_KEY)
+
+const styles = StyleSheet.create({
+  page: { padding: 40, fontFamily: 'Helvetica', backgroundColor: '#ffffff' },
+  titleBox: { border: '2pt solid #1f2a44', padding: 30, marginBottom: 30, alignItems: 'center' },
+  title: { fontSize: 28, fontFamily: 'Helvetica-Bold', color: '#1f2a44', marginBottom: 12 },
+  caseName: { fontSize: 16, fontFamily: 'Helvetica-Bold', marginBottom: 6 },
+  subText: { fontSize: 11, color: '#666666', marginBottom: 4 },
+  sectionTitle: { fontSize: 14, fontFamily: 'Helvetica-Bold', color: '#1f2a44', borderBottom: '2pt solid #1f2a44', paddingBottom: 6, marginBottom: 12, marginTop: 20 },
+  table: { marginBottom: 20 },
+  tableRow: { flexDirection: 'row', borderBottom: '1pt solid #dddddd' },
+  tableLabel: { width: '30%', backgroundColor: '#f5f5f5', padding: 8, fontSize: 10, color: '#555555' },
+  tableValue: { width: '70%', padding: 8, fontSize: 10 },
+  phaseTitle: { backgroundColor: '#1f2a44', color: '#ffffff', padding: '6 12', fontSize: 11, marginBottom: 8, marginTop: 16 },
+  photoGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  photo: { width: '31%', height: 120, objectFit: 'cover' },
+  footer: { position: 'absolute', bottom: 20, left: 40, right: 40, textAlign: 'center', fontSize: 9, color: '#aaaaaa' },
+})
+
+export async function POST(req: NextRequest) {
+  try {
+    const { projectId, userEmail } = await req.json()
+
+    const { data: project } = await supabase.from('projects').select('*').eq('id', projectId).single()
+    if (!project) return NextResponse.json({ error: '案件が見つかりません' }, { status: 404 })
+
+    const { data: photos } = await supabase.from('photos').select('*').eq('project_id', projectId).order('created_at', { ascending: true })
+    if (!photos || photos.length === 0) return NextResponse.json({ error: '写真がありません' }, { status: 400 })
+
+    const getUrl = (path: string) =>
+      `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/photos/${path}`
+
+    // 工程順に並べる
+    const phaseOrder: string[] = project.phase_order ?? []
+    const grouped: Record<string, typeof photos> = {}
+    for (const p of photos) {
+      const phase = p.phase || '未分類'
+      if (!grouped[phase]) grouped[phase] = []
+      grouped[phase].push(p)
+    }
+    const orderedPhases = [
+      ...phaseOrder.filter(p => grouped[p]),
+      ...Object.keys(grouped).filter(p => !phaseOrder.includes(p)),
+    ]
+
+    // PDF生成
+    const pdfBuffer = await renderToBuffer(
+      <Document>
+        <Page size="A4" style={styles.page}>
+          {/* 表紙 */}
+          <View style={styles.titleBox}>
+            <Text style={styles.title}>完工報告書</Text>
+            <Text style={styles.caseName}>{project.case_name}</Text>
+            <Text style={styles.subText}>{project.work_type}</Text>
+            {project.start_date && (
+              <Text style={styles.subText}>工事期間：{project.start_date} 〜 {project.end_date || '未定'}</Text>
+            )}
+          </View>
+
+          {/* 工事概要 */}
+          <Text style={styles.sectionTitle}>工事概要</Text>
+          <View style={styles.table}>
+            <View style={styles.tableRow}>
+              <Text style={styles.tableLabel}>現場名</Text>
+              <Text style={styles.tableValue}>{project.case_name}</Text>
+            </View>
+            <View style={styles.tableRow}>
+              <Text style={styles.tableLabel}>工事種類</Text>
+              <Text style={styles.tableValue}>{project.work_type}</Text>
+            </View>
+            <View style={styles.tableRow}>
+              <Text style={styles.tableLabel}>施工地域</Text>
+              <Text style={styles.tableValue}>{project.area}</Text>
+            </View>
+            {project.start_date && (
+              <View style={styles.tableRow}>
+                <Text style={styles.tableLabel}>工事期間</Text>
+                <Text style={styles.tableValue}>{project.start_date} 〜 {project.end_date || '未定'}</Text>
+              </View>
+            )}
+          </View>
+
+          {/* 施工写真 */}
+          <Text style={styles.sectionTitle}>施工写真</Text>
+          {orderedPhases.map((phase) => (
+            <View key={phase} wrap={false}>
+              <Text style={styles.phaseTitle}>{phase}（{grouped[phase].length}枚）</Text>
+              <View style={styles.photoGrid}>
+                {grouped[phase].slice(0, 6).map((p) => (
+                  <Image key={p.id} src={getUrl(p.storage_path)} style={styles.photo} />
+                ))}
+              </View>
+            </View>
+          ))}
+
+          <Text style={styles.footer}>本書は CraftLog により自動生成されました</Text>
+        </Page>
+      </Document>
+    )
+
+    // メール送信（PDF添付）
+    await resend.emails.send({
+      from: 'onboarding@resend.dev',
+      to: userEmail,
+      subject: `【完工報告書】${project.case_name} ${project.work_type}`,
+      html: `<p>${project.case_name}の完工報告書を添付にてお送りします。</p>`,
+      attachments: [{
+        filename: `完工報告書_${project.case_name}.pdf`,
+        content: pdfBuffer,
+      }],
+    })
+
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    console.error(error)
+    return NextResponse.json({ error: 'エラーが発生しました' }, { status: 500 })
+  }
+}
