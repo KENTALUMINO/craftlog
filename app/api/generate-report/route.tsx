@@ -62,33 +62,48 @@ export async function POST(req: NextRequest) {
       ...Object.keys(grouped).filter(p => !phaseOrder.includes(p)),
     ]
 
-    // 工程ごとに6枚ずつのページを生成
-    type PhotoPage = { phase: string; photos: typeof photos; pageNum: number; totalPages: number }
-    const photoPages: PhotoPage[] = []
+    // 複数工程をbin-packingで1ページに詰め込む（合計6枚以内）
+    // 7枚以上の工程は6枚ずつ分割してから詰め込む
+    type PhaseChunk = { phase: string; photos: typeof photos; chunkNum: number; totalChunks: number }
+    type PageGroup = { phases: PhaseChunk[]; totalPhotos: number }
+
+    const allChunks: PhaseChunk[] = []
     for (const phase of orderedPhases) {
       const phasePhotos = grouped[phase]
-      const chunks: (typeof photos)[] = []
-      for (let i = 0; i < phasePhotos.length; i += 6) chunks.push(phasePhotos.slice(i, i + 6))
-      chunks.forEach((chunk, idx) => {
-        photoPages.push({ phase, photos: chunk, pageNum: idx + 1, totalPages: chunks.length })
-      })
+      const totalChunks = Math.ceil(phasePhotos.length / 4)
+      for (let i = 0; i < phasePhotos.length; i += 4) {
+        allChunks.push({ phase, photos: phasePhotos.slice(i, i + 4), chunkNum: Math.floor(i / 4) + 1, totalChunks })
+      }
     }
 
-    // 写真枚数に応じたレイアウト計算
-    const CONTENT_WIDTH = 515  // 595 - 40*2
-    const PHOTO_AREA_HEIGHT = 640  // 762 - sectionTitle(52) - phaseTitle(47) - margin
-    const GAP = 6
+    const pageGroups: PageGroup[] = []
+    let currentGroup: PageGroup = { phases: [], totalPhotos: 0 }
+    for (const chunk of allChunks) {
+      if (currentGroup.totalPhotos + chunk.photos.length > 4 && currentGroup.totalPhotos > 0) {
+        pageGroups.push(currentGroup)
+        currentGroup = { phases: [], totalPhotos: 0 }
+      }
+      currentGroup.phases.push(chunk)
+      currentGroup.totalPhotos += chunk.photos.length
+    }
+    if (currentGroup.phases.length > 0) pageGroups.push(currentGroup)
 
-    const getPhotoLayout = (count: number) => {
-      let cols: number, rows: number
-      if (count <= 1) { cols = 1; rows = 1 }
-      else if (count <= 2) { cols = 1; rows = 2 }
-      else if (count <= 3) { cols = 1; rows = 3 }
-      else if (count <= 4) { cols = 2; rows = 2 }
-      else { cols = 2; rows = 3 }
+    // 常に2列2行の固定グリッド
+    const COLS = 2
+    const ROWS = 2
+    const GAP = 4
+    const CONTENT_WIDTH = 515  // 595 - padding40*2
+    // sectionTitle: marginTop20 + lineHeight(14*1.2) + paddingBottom6 + border2 + marginBottom12 = 56.8
+    // phaseTitle(1個): marginTop16 + paddingTop6 + lineHeight(11*1.2) + paddingBottom6 + marginBottom0 = 41.2
+    // paddingBottom=0 なので利用可能高さ: 841 - 40 = 801
+    const BASE_PHOTO_AREA = 801 - 56.8 - 41.2  // 703
+    const EXTRA_PHASE = 41.2  // 2工程目以降のphaseTitleの高さ
+
+    const calcPhotoSize = (numPhases: number, cols: number, rows: number) => {
+      const photoAreaH = BASE_PHOTO_AREA - EXTRA_PHASE * (numPhases - 1)
       const photoWidth = (CONTENT_WIDTH - GAP * (cols - 1)) / cols
-      const photoHeight = (PHOTO_AREA_HEIGHT - GAP * (rows - 1)) / rows
-      return { cols, rows, photoWidth, photoHeight }
+      const photoHeight = (photoAreaH - GAP * (rows - 1)) / rows
+      return { photoWidth, photoHeight }
     }
 
     // PDF生成
@@ -139,19 +154,25 @@ export async function POST(req: NextRequest) {
           <Text style={styles.footer}>本書は CraftLog により自動生成されました</Text>
         </Page>
 
-        {/* 施工写真ページ（工程ごと・6枚ずつ・ページを埋めるレイアウト） */}
-        {photoPages.map((pp, i) => {
-          const { cols, rows: numRows, photoWidth, photoHeight } = getPhotoLayout(pp.photos.length)
+        {/* 施工写真ページ（複数工程をbin-packingで1ページに集約） */}
+        {pageGroups.map((pg, i) => {
+          const allPagePhotos = pg.phases.flatMap(pc => pc.photos)
+          const count = allPagePhotos.length
+          // 実際の枚数で列・行を決定（最大2×2）
+          const cols = count <= 2 ? 1 : 2
+          const actualRows = Math.ceil(count / cols)
+          const { photoWidth, photoHeight } = calcPhotoSize(pg.phases.length, cols, actualRows)
           const photoRows: (typeof photos)[] = []
-          for (let r = 0; r < numRows; r++) {
-            photoRows.push(pp.photos.slice(r * cols, (r + 1) * cols))
+          for (let r = 0; r < actualRows; r++) {
+            photoRows.push(allPagePhotos.slice(r * cols, (r + 1) * cols))
           }
           return (
-            <Page key={i} size="A4" style={styles.page}>
+            <Page key={i} size="A4" style={[styles.page, { paddingBottom: 0 }]}>
               <Text style={styles.sectionTitle}>施工写真</Text>
-              <Text style={styles.phaseTitle}>
-                {pp.phase}（{pp.totalPages > 1 ? `${pp.pageNum}/${pp.totalPages} ` : ''}{grouped[pp.phase].length}枚）
-              </Text>
+              {pg.phases.map((pc, pi) => {
+                const label = `${pc.phase}${pc.totalChunks > 1 ? `（${pc.chunkNum}/${pc.totalChunks}）` : ''}　${grouped[pc.phase].length}枚`
+                return <Text key={pi} style={[styles.phaseTitle, { marginBottom: pi === pg.phases.length - 1 ? 0 : 2 }]}>{label}</Text>
+              })}
               <View style={{ flexDirection: 'column', gap: GAP }}>
                 {photoRows.map((row, ri) => (
                   <View key={ri} style={{ flexDirection: 'row', gap: GAP }}>
@@ -165,7 +186,6 @@ export async function POST(req: NextRequest) {
                   </View>
                 ))}
               </View>
-              <Text style={styles.footer}>本書は CraftLog により自動生成されました</Text>
             </Page>
           )
         })}
