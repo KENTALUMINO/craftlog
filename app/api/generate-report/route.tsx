@@ -2,11 +2,13 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { Resend } from 'resend'
 import { renderToBuffer, Document, Page, Text, View, Image, StyleSheet, Font } from '@react-pdf/renderer'
+import path from 'path'
+
 Font.register({
   family: 'NotoSansJP',
   fonts: [
-    { src: 'https://fonts.gstatic.com/s/notosansjp/v53/-F6jfjtqLzI2JPCgQBnw7HFyzSD-AsregP8VFBEj75s.ttf', fontWeight: 'normal' },
-    { src: 'https://fonts.gstatic.com/s/notosansjp/v53/-F6pfjtqLzI2JPCgQBnw7HFQaioq1H1hj-sNFQ.ttf', fontWeight: 'bold' },
+    { src: path.resolve('./public/fonts/NotoSansJP-Regular.ttf'), fontWeight: 'normal' },
+    { src: path.resolve('./public/fonts/NotoSansJP-Bold.ttf'), fontWeight: 'bold' },
   ],
 })
 
