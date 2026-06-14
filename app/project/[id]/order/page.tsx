@@ -96,7 +96,8 @@ export default function OrderPage() {
         <p className="text-sm text-gray-500 mb-5">施工した順番にタップしてください。</p>
 
         <div className="space-y-2 mb-6">
-          {allPhases.map((phase) => {
+          {/* 選択済み（番号順）→ 未選択 の順で表示 */}
+          {[...ordered, ...allPhases.filter(p => !ordered.includes(p))].map((phase) => {
             const idx = ordered.indexOf(phase)
             const isSelected = idx !== -1
             return (
