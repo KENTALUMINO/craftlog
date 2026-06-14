@@ -153,7 +153,10 @@ export default function ProjectPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white border-b border-gray-100 px-4 py-4 flex items-center gap-3">
-        <button onClick={() => router.push('/dashboard')} className="text-gray-400 hover:text-gray-600 text-lg">←</button>
+        <button onClick={() => router.push('/dashboard')} className="flex items-center gap-1.5 text-sm font-medium text-gray-500 hover:text-gray-900 bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded-lg transition-colors">
+          <span>←</span>
+          <span>一覧に戻る</span>
+        </button>
         <div>
           <h1 className="text-base font-bold text-gray-900">{project.case_name}</h1>
           <p className="text-xs text-gray-500">{project.work_type}　{project.area}</p>
