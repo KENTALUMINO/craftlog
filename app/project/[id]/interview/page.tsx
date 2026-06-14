@@ -168,20 +168,21 @@ export default function InterviewPage() {
 
       {/* 入力欄 */}
       {!isDone && (
-        <div className="bg-white border-t border-gray-100 px-4 py-3 flex gap-2 flex-shrink-0">
+        <div className="bg-white border-t border-gray-100 px-3 py-3 flex gap-2 flex-shrink-0 safe-area-bottom">
           <input
             type="text"
             value={input}
             onChange={e => setInput(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleSend()}
-            className="flex-1 border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="flex-1 border border-gray-200 rounded-xl px-3 py-3 text-base text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
             placeholder="回答を入力..."
             disabled={loading}
+            style={{ fontSize: '16px' }}
           />
           <button
             onClick={handleSend}
             disabled={loading || !input.trim()}
-            className="bg-blue-600 text-white rounded-xl px-5 py-3 text-sm font-medium disabled:opacity-40"
+            className="bg-blue-600 text-white rounded-xl px-4 py-3 text-sm font-medium disabled:opacity-40 flex-shrink-0"
           >
             送信
           </button>
