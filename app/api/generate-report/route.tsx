@@ -88,21 +88,11 @@ export async function POST(req: NextRequest) {
     }
     if (currentGroup.phases.length > 0) pageGroups.push(currentGroup)
 
+    // 16:9横長固定レイアウト
     const GAP = 6
-    const CONTENT_WIDTH = 515  // 595 - padding40*2
-    // 安全マージンを大きく取る
-    // paddingBottom=0: 使用可能高さ = 841 - 40(paddingTop) = 801
-    // sectionTitle高さ ≈ 60, phaseTitle1個 ≈ 45
-    // 余裕を持たせて BASE = 801 - 60 - 45 - 30(安全マージン) = 666
-    const BASE_PHOTO_AREA = 666
-    const EXTRA_PHASE = 45  // 2工程目以降のphaseTitle高さ
-
-    const calcPhotoSize = (numPhases: number, cols: number, rows: number) => {
-      const photoAreaH = BASE_PHOTO_AREA - EXTRA_PHASE * (numPhases - 1)
-      const photoWidth = (CONTENT_WIDTH - GAP * (cols - 1)) / cols
-      const photoHeight = (photoAreaH - GAP * (rows - 1)) / rows
-      return { photoWidth, photoHeight }
-    }
+    const CONTENT_WIDTH = 515          // 595 - padding40*2
+    const PHOTO_WIDTH = (CONTENT_WIDTH - GAP) / 2   // 2列固定: 254.5
+    const PHOTO_HEIGHT = PHOTO_WIDTH * 9 / 16        // 16:9: ≈143pt
 
     // PDF生成
     const pdfBuffer = await renderToBuffer(
@@ -153,40 +143,37 @@ export async function POST(req: NextRequest) {
         </Page>
 
         {/* 施工写真ページ（複数工程をbin-packingで1ページに集約） */}
-        {pageGroups.map((pg, i) => {
-          const allPagePhotos = pg.phases.flatMap(pc => pc.photos)
-          const count = allPagePhotos.length
-          // 実際の枚数で列・行を決定（最大2×2）
-          const cols = count <= 2 ? 1 : 2
-          const actualRows = Math.ceil(count / cols)
-          const { photoWidth, photoHeight } = calcPhotoSize(pg.phases.length, cols, actualRows)
-          const photoRows: (typeof photos)[] = []
-          for (let r = 0; r < actualRows; r++) {
-            photoRows.push(allPagePhotos.slice(r * cols, (r + 1) * cols))
-          }
-          return (
-            <Page key={i} size="A4" style={[styles.page, { paddingBottom: 0 }]}>
-              <Text style={styles.sectionTitle}>施工写真</Text>
-              {pg.phases.map((pc, pi) => {
-                const label = `${pc.phase}${pc.totalChunks > 1 ? `（${pc.chunkNum}/${pc.totalChunks}）` : ''}　${grouped[pc.phase].length}枚`
-                return <Text key={pi} style={[styles.phaseTitle, { marginBottom: pi === pg.phases.length - 1 ? 0 : 2 }]}>{label}</Text>
-              })}
-              <View style={{ flexDirection: 'column', gap: GAP }}>
-                {photoRows.map((row, ri) => (
-                  <View key={ri} style={{ flexDirection: 'row', gap: GAP }}>
-                    {row.map((p) => (
-                      <Image
-                        key={p.id}
-                        src={getUrl(p.storage_path)}
-                        style={{ width: photoWidth, height: photoHeight, objectFit: 'cover' }}
-                      />
+        {pageGroups.map((pg, i) => (
+          <Page key={i} size="A4" style={styles.page}>
+            <Text style={styles.sectionTitle}>施工写真</Text>
+            {pg.phases.map((pc, pi) => {
+              // 各工程: タイトル → その工程の写真（2列16:9）
+              const label = `${pc.phase}${pc.totalChunks > 1 ? `（${pc.chunkNum}/${pc.totalChunks}）` : ''}　${grouped[pc.phase].length}枚`
+              const rows: (typeof photos)[] = []
+              for (let r = 0; r * 2 < pc.photos.length; r++) {
+                rows.push(pc.photos.slice(r * 2, r * 2 + 2))
+              }
+              return (
+                <View key={pi}>
+                  <Text style={styles.phaseTitle}>{label}</Text>
+                  <View style={{ flexDirection: 'column', gap: GAP, marginBottom: pi < pg.phases.length - 1 ? 10 : 0 }}>
+                    {rows.map((row, ri) => (
+                      <View key={ri} style={{ flexDirection: 'row', gap: GAP }}>
+                        {row.map((p) => (
+                          <Image
+                            key={p.id}
+                            src={getUrl(p.storage_path)}
+                            style={{ width: PHOTO_WIDTH, height: PHOTO_HEIGHT, objectFit: 'cover' }}
+                          />
+                        ))}
+                      </View>
                     ))}
                   </View>
-                ))}
-              </View>
-            </Page>
-          )
-        })}
+                </View>
+              )
+            })}
+          </Page>
+        ))}
       </Document>
     )
 
