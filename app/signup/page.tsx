@@ -4,22 +4,22 @@ import { useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 
-export default function LoginPage() {
+export default function SignupPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const router = useRouter()
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setError('')
 
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    const { error } = await supabase.auth.signUp({ email, password })
 
     if (error) {
-      setError('メールアドレスまたはパスワードが正しくありません')
+      setError('登録に失敗しました。もう一度お試しください。')
       setLoading(false)
       return
     }
@@ -32,10 +32,10 @@ export default function LoginPage() {
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 w-full max-w-sm p-8">
         <div className="text-center mb-8">
           <h1 className="text-2xl font-bold text-gray-900">CraftLog</h1>
-          <p className="text-sm text-gray-500 mt-1">施工写真・書類管理システム</p>
+          <p className="text-sm text-gray-500 mt-1">アカウントを作成</p>
         </div>
 
-        <form onSubmit={handleLogin} className="space-y-4">
+        <form onSubmit={handleSignup} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               メールアドレス
@@ -59,8 +59,9 @@ export default function LoginPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="••••••••"
+              placeholder="••••••••（6文字以上）"
               required
+              minLength={6}
             />
           </div>
 
@@ -73,13 +74,13 @@ export default function LoginPage() {
             disabled={loading}
             className="w-full bg-blue-600 text-white rounded-lg py-3 text-sm font-medium hover:bg-blue-700 transition disabled:opacity-50"
           >
-            {loading ? 'ログイン中...' : 'ログイン'}
+            {loading ? '登録中...' : 'アカウントを作成'}
           </button>
         </form>
 
         <p className="text-center text-sm text-gray-500 mt-6">
-          アカウントをお持ちでない方は{' '}
-          <a href="/signup" className="text-blue-600 hover:underline">新規登録</a>
+          すでにアカウントをお持ちの方は{' '}
+          <a href="/login" className="text-blue-600 hover:underline">ログイン</a>
         </p>
       </div>
     </div>
