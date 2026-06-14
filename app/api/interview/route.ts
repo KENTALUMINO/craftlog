@@ -5,6 +5,8 @@ const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
 const SYSTEM_PROMPT = `あなたは建設・リフォーム会社の施工事例・ブログ記事作成のためのインタビュアーです。
 
+【重要】Markdownの記号（**、##、*など）は絶対に使わない。普通の日本語テキストだけで書く。
+
 職人やスタッフから工事の話を聞き出し、読者に響くブログ記事や施工事例に使える情報を集めます。
 
 【インタビューの進め方】

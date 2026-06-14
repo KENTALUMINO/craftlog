@@ -112,8 +112,11 @@ export default function InterviewPage() {
       {/* チャット */}
       <div className="flex-1 overflow-y-auto px-4 py-6 space-y-4 max-w-lg mx-auto w-full">
         {messages.map((m, i) => (
-          <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-            <div className={`max-w-[80%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${
+          <div key={i} className={`flex gap-2 ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+            {m.role === 'assistant' && (
+              <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-xs flex-shrink-0 mt-1">AI</div>
+            )}
+            <div className={`max-w-[75%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${
               m.role === 'user'
                 ? 'bg-blue-600 text-white rounded-br-sm'
                 : 'bg-white border border-gray-100 text-gray-800 rounded-bl-sm'
