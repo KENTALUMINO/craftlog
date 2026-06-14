@@ -164,6 +164,12 @@ export default function ProjectPage() {
     fetchPhotos()
   }
 
+  const handleDeletePhoto = async (photo: Photo) => {
+    await supabase.storage.from('photos').remove([photo.storage_path])
+    await supabase.from('photos').delete().eq('id', photo.id)
+    fetchPhotos()
+  }
+
   const handleGenerateReport = async () => {
     setGenerating(true)
     setReportSent(false)
@@ -362,8 +368,16 @@ export default function ProjectPage() {
             </div>
             <div className="grid grid-cols-3 gap-2">
               {phasePhotos.map((photo) => (
-                <div key={photo.id} className="aspect-square rounded-lg overflow-hidden bg-gray-100">
+                <div key={photo.id} className="aspect-square rounded-lg overflow-hidden bg-gray-100 relative group">
                   {photo.url && <img src={photo.url} alt={photo.original_name} className="w-full h-full object-cover" />}
+                  <button
+                    onClick={() => {
+                      if (confirm('この写真を削除しますか？')) handleDeletePhoto(photo)
+                    }}
+                    className="absolute top-1 right-1 bg-black/60 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-red-600 transition"
+                  >
+                    ✕
+                  </button>
                 </div>
               ))}
             </div>
