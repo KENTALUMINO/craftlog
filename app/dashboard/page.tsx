@@ -177,7 +177,7 @@ export default function DashboardPage() {
             </div>
           )}
           {projects.map(p => (
-            <div key={p.id} className="bg-white rounded-xl border border-gray-100 px-5 py-4">
+            <div key={p.id} onClick={() => router.push(`/project/${p.id}`)} className="bg-white rounded-xl border border-gray-100 px-5 py-4 cursor-pointer hover:border-blue-200 transition">
               <div className="flex justify-between items-start">
                 <div>
                   <p className="font-medium text-gray-900">{p.case_name}</p>
@@ -186,7 +186,7 @@ export default function DashboardPage() {
                     <p className="text-xs text-gray-400 mt-1">{p.start_date} 〜 {p.end_date || '未定'}</p>
                   )}
                 </div>
-                <span className="text-xs bg-blue-50 text-blue-600 rounded-full px-3 py-1">進行中</span>
+                <span className="text-xs bg-blue-50 text-blue-600 rounded-full px-3 py-1">進行中 →</span>
               </div>
             </div>
           ))}
