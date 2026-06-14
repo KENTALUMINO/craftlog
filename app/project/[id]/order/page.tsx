@@ -14,7 +14,8 @@ export default function OrderPage() {
   const router = useRouter()
 
   const [project, setProject] = useState<Project | null>(null)
-  const [phases, setPhases] = useState<string[]>([])
+  const [allPhases, setAllPhases] = useState<string[]>([])
+  const [ordered, setOrdered] = useState<string[]>([]) // タップした順
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
@@ -28,36 +29,30 @@ export default function OrderPage() {
       const { data: photos } = await supabase.from('photos').select('phase').eq('project_id', id)
       if (photos) {
         const detected = [...new Set(photos.map(p => p.phase).filter(Boolean))] as string[]
-        // 保存済みの順番があればそれを使い、新しい工程は末尾に追加
+        setAllPhases(detected)
+        // 保存済みの順番があればプリセット
         if (proj?.phase_order && proj.phase_order.length > 0) {
-          const saved = proj.phase_order as string[]
-          const merged = [...saved.filter((p: string) => detected.includes(p)), ...detected.filter(p => !saved.includes(p))]
-          setPhases(merged)
-        } else {
-          setPhases(detected)
+          const saved = (proj.phase_order as string[]).filter(p => detected.includes(p))
+          setOrdered(saved)
         }
       }
     }
     init()
   }, [id])
 
-  const moveUp = (i: number) => {
-    if (i === 0) return
-    const next = [...phases]
-    ;[next[i - 1], next[i]] = [next[i], next[i - 1]]
-    setPhases(next)
-  }
-
-  const moveDown = (i: number) => {
-    if (i === phases.length - 1) return
-    const next = [...phases]
-    ;[next[i], next[i + 1]] = [next[i + 1], next[i]]
-    setPhases(next)
+  const handleTap = (phase: string) => {
+    if (ordered.includes(phase)) {
+      // タップ済みなら解除（それ以降の番号もリセット）
+      const idx = ordered.indexOf(phase)
+      setOrdered(ordered.slice(0, idx))
+    } else {
+      setOrdered([...ordered, phase])
+    }
   }
 
   const handleSave = async () => {
     setSaving(true)
-    await supabase.from('projects').update({ phase_order: phases }).eq('id', id)
+    await supabase.from('projects').update({ phase_order: ordered }).eq('id', id)
     setSaving(false)
     router.push(`/project/${id}/report`)
   }
@@ -65,6 +60,8 @@ export default function OrderPage() {
   if (!project) return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center text-gray-400">読み込み中...</div>
   )
+
+  const remaining = allPhases.filter(p => !ordered.includes(p))
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -94,33 +91,46 @@ export default function OrderPage() {
       </div>
 
       <main className="max-w-lg mx-auto px-4 py-6">
-        <p className="text-sm text-gray-500 mb-4">工程を施工順に並べてください。↑↓で順番を変えられます。</p>
+        <p className="text-sm text-gray-500 mb-5">施工した順番にタップしてください。</p>
 
-        {phases.length === 0 && (
-          <div className="text-center py-16 text-gray-400 text-sm">工程がまだ登録されていません。</div>
-        )}
-
-        <div className="space-y-2">
-          {phases.map((phase, i) => (
-            <div key={phase} className="bg-white rounded-xl border border-gray-100 px-4 py-3 flex items-center gap-3">
-              <span className="w-7 h-7 rounded-full bg-blue-50 text-blue-600 text-xs font-bold flex items-center justify-center flex-shrink-0">
-                {i + 1}
-              </span>
-              <span className="flex-1 text-sm text-gray-900 font-medium">{phase}</span>
-              <div className="flex flex-col gap-1">
-                <button onClick={() => moveUp(i)} disabled={i === 0}
-                  className="text-gray-400 hover:text-gray-700 disabled:opacity-20 text-xs px-2 py-0.5 bg-gray-50 rounded">↑</button>
-                <button onClick={() => moveDown(i)} disabled={i === phases.length - 1}
-                  className="text-gray-400 hover:text-gray-700 disabled:opacity-20 text-xs px-2 py-0.5 bg-gray-50 rounded">↓</button>
-              </div>
-            </div>
-          ))}
+        <div className="space-y-2 mb-6">
+          {allPhases.map((phase) => {
+            const idx = ordered.indexOf(phase)
+            const isSelected = idx !== -1
+            return (
+              <button
+                key={phase}
+                onClick={() => handleTap(phase)}
+                className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl border text-left transition ${
+                  isSelected
+                    ? 'bg-blue-600 border-blue-600 text-white'
+                    : 'bg-white border-gray-100 text-gray-700 hover:border-blue-200'
+                }`}
+              >
+                <span className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0 ${
+                  isSelected ? 'bg-white text-blue-600' : 'bg-gray-100 text-gray-400'
+                }`}>
+                  {isSelected ? idx + 1 : ''}
+                </span>
+                <span className="font-medium text-sm">{phase}</span>
+              </button>
+            )
+          })}
         </div>
 
-        {phases.length > 0 && (
-          <button onClick={handleSave} disabled={saving}
-            className="w-full bg-gray-900 text-white rounded-xl py-4 text-sm font-medium mt-6 disabled:opacity-50">
-            {saving ? '保存中...' : 'この順番で確定して次へ →'}
+        {remaining.length > 0 && (
+          <p className="text-xs text-center text-gray-400 mb-4">
+            残り{remaining.length}工程をタップしてください
+          </p>
+        )}
+
+        {ordered.length > 0 && (
+          <button
+            onClick={handleSave}
+            disabled={saving || remaining.length > 0}
+            className="w-full bg-gray-900 text-white rounded-xl py-4 text-sm font-medium disabled:opacity-40"
+          >
+            {saving ? '保存中...' : remaining.length > 0 ? `残り${remaining.length}工程あります` : 'この順番で確定して次へ →'}
           </button>
         )}
       </main>
