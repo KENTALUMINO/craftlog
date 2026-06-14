@@ -116,7 +116,7 @@ export default function InterviewPage() {
             {m.role === 'assistant' && (
               <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-xs flex-shrink-0 mt-1">AI</div>
             )}
-            <div className={`max-w-[75%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${
+            <div className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-7 whitespace-pre-wrap break-words ${
               m.role === 'user'
                 ? 'bg-blue-600 text-white rounded-br-sm'
                 : 'bg-white border border-gray-100 text-gray-800 rounded-bl-sm'
