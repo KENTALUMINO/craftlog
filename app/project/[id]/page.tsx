@@ -30,6 +30,12 @@ export default function ProjectPage() {
   const [uploading, setUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
 
+  // 工程入力モード
+  const [pendingPhotos, setPendingPhotos] = useState<Photo[]>([])
+  const [showPhaseInput, setShowPhaseInput] = useState(false)
+  const [phaseInput, setPhaseInput] = useState('')
+  const [pastPhases, setPastPhases] = useState<string[]>([])
+
   useEffect(() => {
     const init = async () => {
       const { data: { user } } = await supabase.auth.getUser()
@@ -58,6 +64,10 @@ export default function ProjectPage() {
         return { ...p, url: urlData.publicUrl }
       }))
       setPhotos(withUrls)
+
+      // 過去の工程名を抽出
+      const phases = [...new Set(data.map(p => p.phase).filter(Boolean))] as string[]
+      setPastPhases(phases)
     }
   }
 
@@ -71,6 +81,8 @@ export default function ProjectPage() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
 
+    const uploaded: Photo[] = []
+
     for (let i = 0; i < files.length; i++) {
       const file = files[i]
       const ext = file.name.split('.').pop()
@@ -78,21 +90,44 @@ export default function ProjectPage() {
 
       const { error } = await supabase.storage.from('photos').upload(path, file)
       if (!error) {
-        await supabase.from('photos').insert({
+        const { data: inserted } = await supabase.from('photos').insert({
           project_id: id,
           user_id: user.id,
           storage_path: path,
           original_name: file.name,
           phase: null,
-        })
+        }).select().single()
+
+        if (inserted) {
+          const { data: urlData } = supabase.storage.from('photos').getPublicUrl(path)
+          uploaded.push({ ...inserted, url: urlData.publicUrl })
+        }
       }
       setUploadProgress(Math.round(((i + 1) / files.length) * 100))
     }
 
     setUploading(false)
     setUploadProgress(0)
-    fetchPhotos()
+
     if (fileInputRef.current) fileInputRef.current.value = ''
+
+    // 工程入力モードへ
+    setPendingPhotos(uploaded)
+    setShowPhaseInput(true)
+    setPhaseInput('')
+  }
+
+  const handleAssignPhase = async (phase: string) => {
+    if (!phase.trim()) return
+
+    await Promise.all(pendingPhotos.map(p =>
+      supabase.from('photos').update({ phase }).eq('id', p.id)
+    ))
+
+    setShowPhaseInput(false)
+    setPendingPhotos([])
+    setPhaseInput('')
+    fetchPhotos()
   }
 
   const groupedPhotos = photos.reduce((acc, photo) => {
@@ -102,12 +137,14 @@ export default function ProjectPage() {
     return acc
   }, {} as Record<string, Photo[]>)
 
-  if (!project) return <div className="min-h-screen bg-gray-50 flex items-center justify-center text-gray-400">読み込み中...</div>
+  if (!project) return (
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center text-gray-400">読み込み中...</div>
+  )
 
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white border-b border-gray-100 px-4 py-4 flex items-center gap-3">
-        <button onClick={() => router.push('/dashboard')} className="text-gray-400 hover:text-gray-600">
+        <button onClick={() => router.push('/dashboard')} className="text-gray-400 hover:text-gray-600 text-lg">
           ←
         </button>
         <div>
@@ -117,6 +154,76 @@ export default function ProjectPage() {
       </header>
 
       <main className="max-w-2xl mx-auto px-4 py-6">
+
+        {/* 工程入力モーダル */}
+        {showPhaseInput && (
+          <div className="fixed inset-0 bg-black/50 flex items-end justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl w-full max-w-md p-6">
+              <h3 className="text-base font-bold text-gray-900 mb-1">工程名を入力</h3>
+              <p className="text-xs text-gray-500 mb-4">{pendingPhotos.length}枚の写真に工程名を設定します</p>
+
+              {/* プレビュー */}
+              <div className="flex gap-2 mb-4 overflow-x-auto">
+                {pendingPhotos.slice(0, 4).map(p => (
+                  <div key={p.id} className="w-16 h-16 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
+                    {p.url && <img src={p.url} alt="" className="w-full h-full object-cover" />}
+                  </div>
+                ))}
+                {pendingPhotos.length > 4 && (
+                  <div className="w-16 h-16 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0 text-xs text-gray-500">
+                    +{pendingPhotos.length - 4}
+                  </div>
+                )}
+              </div>
+
+              {/* 過去の工程名 */}
+              {pastPhases.length > 0 && (
+                <div className="mb-3">
+                  <p className="text-xs text-gray-400 mb-2">過去の工程名から選ぶ</p>
+                  <div className="flex flex-wrap gap-2">
+                    {pastPhases.map(phase => (
+                      <button
+                        key={phase}
+                        onClick={() => handleAssignPhase(phase)}
+                        className="text-xs bg-gray-100 text-gray-700 rounded-full px-3 py-1.5 hover:bg-blue-50 hover:text-blue-600 transition"
+                      >
+                        {phase}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* 新しい工程名 */}
+              <input
+                type="text"
+                value={phaseInput}
+                onChange={e => setPhaseInput(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleAssignPhase(phaseInput)}
+                className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 mb-3"
+                placeholder="例：高圧洗浄、下地補修..."
+                autoFocus
+              />
+
+              <div className="flex gap-2">
+                <button
+                  onClick={() => { setShowPhaseInput(false); fetchPhotos() }}
+                  className="flex-1 border border-gray-200 text-gray-600 rounded-xl py-3 text-sm"
+                >
+                  後で設定
+                </button>
+                <button
+                  onClick={() => handleAssignPhase(phaseInput)}
+                  disabled={!phaseInput.trim()}
+                  className="flex-1 bg-blue-600 text-white rounded-xl py-3 text-sm font-medium disabled:opacity-40"
+                >
+                  設定する
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* アップロードボタン */}
         <div
           onClick={() => fileInputRef.current?.click()}
@@ -124,7 +231,7 @@ export default function ProjectPage() {
         >
           <p className="text-2xl mb-1">📷</p>
           <p className="font-medium">写真を選んで送信</p>
-          <p className="text-xs text-blue-200 mt-1">複数まとめて選択OK</p>
+          <p className="text-xs text-blue-200 mt-1">送信後に工程名を入力</p>
         </div>
 
         <input
@@ -143,10 +250,7 @@ export default function ProjectPage() {
               <span>{uploadProgress}%</span>
             </div>
             <div className="w-full bg-gray-100 rounded-full h-2">
-              <div
-                className="bg-blue-600 h-2 rounded-full transition-all"
-                style={{ width: `${uploadProgress}%` }}
-              />
+              <div className="bg-blue-600 h-2 rounded-full transition-all" style={{ width: `${uploadProgress}%` }} />
             </div>
           </div>
         )}
@@ -169,13 +273,7 @@ export default function ProjectPage() {
             <div className="grid grid-cols-3 gap-2">
               {phasePhotos.map((photo) => (
                 <div key={photo.id} className="aspect-square rounded-lg overflow-hidden bg-gray-100">
-                  {photo.url && (
-                    <img
-                      src={photo.url}
-                      alt={photo.original_name}
-                      className="w-full h-full object-cover"
-                    />
-                  )}
+                  {photo.url && <img src={photo.url} alt={photo.original_name} className="w-full h-full object-cover" />}
                 </div>
               ))}
             </div>
