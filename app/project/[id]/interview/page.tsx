@@ -22,6 +22,17 @@ export default function InterviewPage() {
   const [copied, setCopied] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
 
+  const getPlaceholder = () => {
+    const last = messages.filter(m => m.role === 'assistant').slice(-1)[0]?.content ?? ''
+    if (last.includes('お悩み') || last.includes('困って') || last.includes('きっかけ')) return '例）雨漏りが3年前から続いていて、天井にシミが出てきた'
+    if (last.includes('状態') || last.includes('様子') || last.includes('どんな')) return '例）コケが広がっていて、板金部分が錆びていた'
+    if (last.includes('提案') || last.includes('工夫') || last.includes('ポイント')) return '例）既存の屋根の上にカバー工法で重ね張りした'
+    if (last.includes('期間') || last.includes('どのくらい')) return '例）5年以上前から少しずつひどくなっていた'
+    if (last.includes('反応') || last.includes('言葉') || last.includes('喜')) return '例）「こんなにきれいになるとは思わなかった」と言ってくれた'
+    if (last.includes('金額') || last.includes('費用') || last.includes('予算')) return '例）最初は外壁もやりたかったが、今回は屋根だけに絞った'
+    return '例）〜でした、〜してもらいました'
+  }
+
   useEffect(() => {
     const init = async () => {
       const { data: { user } } = await supabase.auth.getUser()
@@ -174,8 +185,8 @@ export default function InterviewPage() {
             value={input}
             onChange={e => setInput(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleSend()}
-            className="flex-1 border border-gray-200 rounded-xl px-3 py-3 text-base text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="回答を入力..."
+            className="flex-1 border border-gray-200 rounded-xl px-3 py-3 text-base text-gray-900 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder={getPlaceholder()}
             disabled={loading}
             style={{ fontSize: '16px' }}
           />
