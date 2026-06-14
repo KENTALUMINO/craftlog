@@ -73,19 +73,15 @@ export default function Home() {
             ].map((item) => (
               <div
                 key={item.num}
-                className={`rounded-2xl p-10 text-center ${
-                  item.accent
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-white border border-gray-200 text-gray-900'
-                }`}
+                className="group rounded-2xl p-10 text-center bg-white border border-gray-200 hover:bg-blue-600 hover:border-blue-600 transition-colors duration-200 cursor-default"
               >
-                <div className={`text-4xl font-black mb-6 ${item.accent ? 'text-blue-300' : 'text-gray-200'}`}>
+                <div className="text-4xl font-black mb-6 text-gray-200 group-hover:text-blue-300 transition-colors duration-200">
                   {item.num}
                 </div>
-                <h3 className={`text-xl font-bold mb-4 ${item.accent ? 'text-white' : 'text-gray-900'}`}>
+                <h3 className="text-xl font-bold mb-4 text-gray-900 group-hover:text-white transition-colors duration-200">
                   {item.title}
                 </h3>
-                <p className={`text-sm leading-relaxed ${item.accent ? 'text-blue-100' : 'text-gray-500'}`}>
+                <p className="text-sm leading-relaxed text-gray-500 group-hover:text-blue-100 transition-colors duration-200">
                   {item.desc}
                 </p>
               </div>
@@ -126,16 +122,12 @@ export default function Home() {
             ].map((item) => (
               <div
                 key={item.title}
-                className={`rounded-2xl p-10 text-left ${
-                  item.accent
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-50 border border-gray-100'
-                }`}
+                className="group rounded-2xl p-10 text-left bg-gray-50 border border-gray-100 hover:bg-blue-600 hover:border-blue-600 transition-colors duration-200 cursor-default"
               >
-                <h3 className={`text-xl font-bold mb-3 ${item.accent ? 'text-white' : 'text-gray-900'}`}>
+                <h3 className="text-xl font-bold mb-3 text-gray-900 group-hover:text-white transition-colors duration-200">
                   {item.title}
                 </h3>
-                <p className={`text-sm leading-relaxed ${item.accent ? 'text-blue-100' : 'text-gray-500'}`}>
+                <p className="text-sm leading-relaxed text-gray-500 group-hover:text-blue-100 transition-colors duration-200">
                   {item.desc}
                 </p>
               </div>
