@@ -74,6 +74,23 @@ export async function POST(req: NextRequest) {
       })
     }
 
+    // 写真枚数に応じたレイアウト計算
+    const CONTENT_WIDTH = 515  // 595 - 40*2
+    const PHOTO_AREA_HEIGHT = 640  // 762 - sectionTitle(52) - phaseTitle(47) - margin
+    const GAP = 6
+
+    const getPhotoLayout = (count: number) => {
+      let cols: number, rows: number
+      if (count <= 1) { cols = 1; rows = 1 }
+      else if (count <= 2) { cols = 1; rows = 2 }
+      else if (count <= 3) { cols = 1; rows = 3 }
+      else if (count <= 4) { cols = 2; rows = 2 }
+      else { cols = 2; rows = 3 }
+      const photoWidth = (CONTENT_WIDTH - GAP * (cols - 1)) / cols
+      const photoHeight = (PHOTO_AREA_HEIGHT - GAP * (rows - 1)) / rows
+      return { cols, rows, photoWidth, photoHeight }
+    }
+
     // PDF生成
     const pdfBuffer = await renderToBuffer(
       <Document>
@@ -122,21 +139,36 @@ export async function POST(req: NextRequest) {
           <Text style={styles.footer}>本書は CraftLog により自動生成されました</Text>
         </Page>
 
-        {/* 施工写真ページ（工程ごと・6枚ずつ） */}
-        {photoPages.map((pp, i) => (
-          <Page key={i} size="A4" style={styles.page}>
-            <Text style={styles.sectionTitle}>施工写真</Text>
-            <Text style={styles.phaseTitle}>
-              {pp.phase}（{pp.totalPages > 1 ? `${pp.pageNum}/${pp.totalPages} ` : ''}{grouped[pp.phase].length}枚）
-            </Text>
-            <View style={styles.photoGrid}>
-              {pp.photos.map((p) => (
-                <Image key={p.id} src={getUrl(p.storage_path)} style={styles.photo} />
-              ))}
-            </View>
-            <Text style={styles.footer}>本書は CraftLog により自動生成されました</Text>
-          </Page>
-        ))}
+        {/* 施工写真ページ（工程ごと・6枚ずつ・ページを埋めるレイアウト） */}
+        {photoPages.map((pp, i) => {
+          const { cols, rows: numRows, photoWidth, photoHeight } = getPhotoLayout(pp.photos.length)
+          const photoRows: (typeof photos)[] = []
+          for (let r = 0; r < numRows; r++) {
+            photoRows.push(pp.photos.slice(r * cols, (r + 1) * cols))
+          }
+          return (
+            <Page key={i} size="A4" style={styles.page}>
+              <Text style={styles.sectionTitle}>施工写真</Text>
+              <Text style={styles.phaseTitle}>
+                {pp.phase}（{pp.totalPages > 1 ? `${pp.pageNum}/${pp.totalPages} ` : ''}{grouped[pp.phase].length}枚）
+              </Text>
+              <View style={{ flexDirection: 'column', gap: GAP }}>
+                {photoRows.map((row, ri) => (
+                  <View key={ri} style={{ flexDirection: 'row', gap: GAP }}>
+                    {row.map((p) => (
+                      <Image
+                        key={p.id}
+                        src={getUrl(p.storage_path)}
+                        style={{ width: photoWidth, height: photoHeight, objectFit: 'cover' }}
+                      />
+                    ))}
+                  </View>
+                ))}
+              </View>
+              <Text style={styles.footer}>本書は CraftLog により自動生成されました</Text>
+            </Page>
+          )
+        })}
       </Document>
     )
 
