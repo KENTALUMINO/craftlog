@@ -74,6 +74,9 @@ export default function DashboardPage() {
         <h1 className="text-lg font-bold text-gray-900">CraftLog</h1>
         <div className="flex items-center gap-4">
           <span className="text-sm text-gray-500">{userEmail}</span>
+          <button onClick={() => router.push('/settings')} className="text-sm text-gray-500 hover:text-gray-700">
+            設定
+          </button>
           <button onClick={handleLogout} className="text-sm text-gray-500 hover:text-gray-700">
             ログアウト
           </button>
