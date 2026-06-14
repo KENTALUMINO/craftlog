@@ -13,7 +13,7 @@ export default function Home() {
               ログイン
             </Link>
             <Link href="/signup" className="text-sm bg-gray-900 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors">
-              無料で始める
+              新規登録する
             </Link>
           </div>
         </div>
@@ -34,7 +34,7 @@ export default function Home() {
           </p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <Link href="/signup" className="bg-gray-900 text-white px-8 py-3.5 rounded-lg font-medium hover:bg-gray-700 transition-colors">
-              無料で始める
+              新規登録する
             </Link>
             <Link href="/login" className="border border-gray-200 text-gray-700 px-8 py-3.5 rounded-lg font-medium hover:bg-gray-50 transition-colors">
               ログインする
@@ -91,11 +91,11 @@ export default function Home() {
         <div className="max-w-xl mx-auto">
           <h2 className="text-3xl font-bold mb-4">まず使ってみてください</h2>
           <p className="text-gray-400 mb-10 leading-relaxed">
-            登録は1分。クレジットカード不要。<br />
+            登録は1分。<br />
             現場でそのまま使えます。
           </p>
           <Link href="/signup" className="inline-block bg-white text-gray-900 px-10 py-3.5 rounded-lg font-semibold hover:bg-gray-100 transition-colors">
-            無料で始める →
+            新規登録する →
           </Link>
         </div>
       </section>
