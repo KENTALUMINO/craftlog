@@ -88,16 +88,14 @@ export async function POST(req: NextRequest) {
     }
     if (currentGroup.phases.length > 0) pageGroups.push(currentGroup)
 
-    // 常に2列2行の固定グリッド
-    const COLS = 2
-    const ROWS = 2
-    const GAP = 4
+    const GAP = 6
     const CONTENT_WIDTH = 515  // 595 - padding40*2
-    // sectionTitle: marginTop20 + lineHeight(14*1.2) + paddingBottom6 + border2 + marginBottom12 = 56.8
-    // phaseTitle(1個): marginTop16 + paddingTop6 + lineHeight(11*1.2) + paddingBottom6 + marginBottom0 = 41.2
-    // paddingBottom=0 なので利用可能高さ: 841 - 40 = 801
-    const BASE_PHOTO_AREA = 801 - 56.8 - 41.2  // 703
-    const EXTRA_PHASE = 41.2  // 2工程目以降のphaseTitleの高さ
+    // 安全マージンを大きく取る
+    // paddingBottom=0: 使用可能高さ = 841 - 40(paddingTop) = 801
+    // sectionTitle高さ ≈ 60, phaseTitle1個 ≈ 45
+    // 余裕を持たせて BASE = 801 - 60 - 45 - 30(安全マージン) = 666
+    const BASE_PHOTO_AREA = 666
+    const EXTRA_PHASE = 45  // 2工程目以降のphaseTitle高さ
 
     const calcPhotoSize = (numPhases: number, cols: number, rows: number) => {
       const photoAreaH = BASE_PHOTO_AREA - EXTRA_PHASE * (numPhases - 1)
