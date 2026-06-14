@@ -240,6 +240,18 @@ export default function ProjectPage() {
           </div>
         )}
 
+        {/* インタビューボタン */}
+        {photos.length > 0 && (
+          <div className="mb-3">
+            <button
+              onClick={() => router.push(`/project/${id}/interview`)}
+              className="w-full bg-indigo-600 text-white rounded-xl py-4 text-sm font-medium"
+            >
+              ✨ 施工事例・ブログ記事を作る
+            </button>
+          </div>
+        )}
+
         {/* 完工報告書ボタン */}
         {photos.length > 0 && (
           <div className="mb-4">
