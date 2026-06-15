@@ -110,22 +110,66 @@ export default function OrderPage() {
         if (Array.isArray(proj.phase_order)) setUncatOrdered(proj.phase_order)
       }
 
-      const { data: photos } = await supabase.from('photos').select('phase, storage_path').eq('project_id', id)
+      const { data: photos } = await supabase.from('photos').select('phase, phase_category, storage_path').eq('project_id', id)
       if (photos) {
         const detected = [...new Set(photos.map(p => p.phase).filter(Boolean))] as string[]
         setAllPhases(detected)
-        // 工程ごとに写真パスをまとめる（サムネイル表示用）
+
+        // 工程×場所のコンポジットキーで写真をまとめる（同名工程が別場所に混在しないよう分離）
         const grouped: Record<string, string[]> = {}
         for (const p of photos) {
           if (!p.phase || !p.storage_path) continue
-          if (!grouped[p.phase]) grouped[p.phase] = []
-          grouped[p.phase].push(p.storage_path)
+          const key = p.phase_category ? `${p.phase}@@@${p.phase_category}` : p.phase
+          if (!grouped[key]) grouped[key] = []
+          grouped[key].push(p.storage_path)
         }
         setPhotosByPhase(grouped)
+
+        // カテゴリーが未設定なら、phase_categoryから自動生成
+        const hasSavedCats = proj && Array.isArray(proj.phase_categories) && proj.phase_categories.length > 0
+        if (!hasSavedCats) {
+          // 各工程が最も多く属するカテゴリーを票数で決定
+          const phaseCatVotes: Record<string, Record<string, number>> = {}
+          for (const p of photos) {
+            if (!p.phase || !p.phase_category) continue
+            if (!phaseCatVotes[p.phase]) phaseCatVotes[p.phase] = {}
+            phaseCatVotes[p.phase][p.phase_category] = (phaseCatVotes[p.phase][p.phase_category] ?? 0) + 1
+          }
+          const catNames = [...new Set(photos.map(p => p.phase_category).filter(Boolean))] as string[]
+          if (catNames.length > 0) {
+            const autoCats: Category[] = catNames.map((name, i) => ({
+              id: `cat-auto-${Date.now()}-${i}`,
+              name,
+              phases: [] as string[],
+            }))
+            for (const phase of detected) {
+              if (!phaseCatVotes[phase]) continue
+              const [primaryEntry] = Object.entries(phaseCatVotes[phase]).sort(([, a], [, b]) => b - a)
+              const cat = autoCats.find(c => c.name === primaryEntry[0])
+              if (cat) cat.phases.push(phase)
+            }
+            setCategories(autoCats)
+            const initialCatOrders: Record<string, string[]> = {}
+            for (const c of autoCats) initialCatOrders[c.id] = c.phases
+            setCatOrders(initialCatOrders)
+          }
+        }
       }
     }
     init()
   }, [id])
+
+  // 工程名＋カテゴリー名で正しい写真パスを取得するヘルパー
+  const getPhotosByPhaseAndCat = (phase: string, catName?: string) => {
+    if (catName) {
+      const compositeKey = `${phase}@@@${catName}`
+      if (photosByPhase[compositeKey]) return photosByPhase[compositeKey]
+    }
+    // カテゴリーなし or コンポジットキーが存在しない場合は全マッチをマージ
+    return Object.entries(photosByPhase)
+      .filter(([k]) => k === phase || k.startsWith(`${phase}@@@`))
+      .flatMap(([, paths]) => paths)
+  }
 
   const categorizedSet = new Set(categories.flatMap(c => c.phases))
   const uncategorized = allPhases.filter(p => !categorizedSet.has(p))
@@ -357,7 +401,7 @@ export default function OrderPage() {
                           <span className="flex-1 text-sm font-medium" style={{ color: 'var(--cl-text)' }}>
                             {phase}
                             <span className="ml-1.5 text-xs" style={{ color: 'var(--cl-text-muted)' }}>
-                              {photosByPhase[phase]?.length ?? 0}枚
+                              {getPhotosByPhaseAndCat(phase).length}枚
                             </span>
                           </span>
                           <button onClick={() => { setRenamingPhase(phase); setRenameValue(phase) }}
@@ -373,9 +417,7 @@ export default function OrderPage() {
                             </button>
                           )}
                         </div>
-                        {photosByPhase[phase] && (
-                          <PhaseThumbs paths={photosByPhase[phase]} getUrl={getThumbUrl} onClickPhoto={setLightboxUrl} />
-                        )}
+                        <PhaseThumbs paths={getPhotosByPhaseAndCat(phase)} getUrl={getThumbUrl} onClickPhoto={setLightboxUrl} />
                       </>
                     )}
                   </div>
@@ -459,7 +501,7 @@ export default function OrderPage() {
                             <span className="flex-1 text-sm" style={{ color: 'var(--cl-text)' }}>
                               {phase}
                               <span className="ml-1.5 text-xs" style={{ color: 'var(--cl-text-muted)' }}>
-                                {photosByPhase[phase]?.length ?? 0}枚
+                                {getPhotosByPhaseAndCat(phase, cat.name).length}枚
                               </span>
                             </span>
                             <button onClick={() => { setRenamingPhase(phase); setRenameValue(phase) }}
@@ -473,9 +515,7 @@ export default function OrderPage() {
                               ← 外す
                             </button>
                           </div>
-                          {photosByPhase[phase] && (
-                            <PhaseThumbs paths={photosByPhase[phase]} getUrl={getThumbUrl} />
-                          )}
+                          <PhaseThumbs paths={getPhotosByPhaseAndCat(phase, cat.name)} getUrl={getThumbUrl} onClickPhoto={setLightboxUrl} />
                         </>
                       )}
                     </div>
