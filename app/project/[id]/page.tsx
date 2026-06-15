@@ -114,7 +114,10 @@ export default function ProjectPage() {
         })
         const ocrData = await ocrRes.json()
         if (ocrData.phase) {
-          await supabase.from('photos').update({ phase: ocrData.phase }).eq('id', photo.id)
+          await supabase.from('photos').update({
+            phase: ocrData.phase,
+            phase_category: ocrData.category ?? null,
+          }).eq('id', photo.id)
         } else {
           needsManual.push(photo)
         }

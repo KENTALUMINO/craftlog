@@ -31,9 +31,13 @@ export async function POST(req: NextRequest) {
     const base64 = Buffer.from(arrayBuffer).toString('base64')
     const contentType = imageRes.headers.get('content-type') || 'image/jpeg'
 
+    const standardPhasesText = standardPhases.length > 0
+      ? `\n\n【標準工程名リスト】（作業名はこの中から選ぶ）\n${standardPhases.join('\n')}`
+      : ''
+
     const response = await client.messages.create({
       model: 'claude-haiku-4-5-20251001',
-      max_tokens: 100,
+      max_tokens: 150,
       messages: [{
         role: 'user',
         content: [
@@ -43,42 +47,46 @@ export async function POST(req: NextRequest) {
           },
           {
             type: 'text',
-            text: standardPhases.length > 0
-              ? `この写真に工事黒板（デジタル黒板含む）が写っている場合、以下の【標準工程名リスト】の中から最も近いものを選んでください。
+            text: `この写真に工事黒板（デジタル黒板含む）が写っている場合、以下の2つを読み取ってください。${standardPhasesText}
 
-【標準工程名リスト】
-${standardPhases.join('\n')}
+【読み取る項目】
+1. category（大工程）: 工事の大きな種類。例：「塗装工事」「長尺シート工事」「爆裂補修」「防水工事」
+2. phase（作業名）: 「工事場所や対象物 ＋ 具体的な作業」の形で。例：「廊下 シート裁断」「分電盤 下塗り」「バルコニー 端末シール」${standardPhases.length > 0 ? '\n   ※作業名は標準工程名リストから最も近いものを選ぶ' : ''}
 
-【選び方のルール】
-- 黒板の作業内容がリストのどれかと同じなら、リストの名前をそのまま返す
-- リストにない作業なら、黒板から作業名のみを短く抽出する（案件名・場所名・会社名・日付は除く）
-- 黒板がない場合は「なし」とだけ返す
-- 工程名のみを返す。説明文不要。`
-              : `この写真に工事黒板（デジタル黒板含む）が写っている場合、「工程名・作業名」だけを抽出してください。
+【除外するもの】
+- 工事件名・案件名（第2ファミール等）
+- 会社名・日付
 
-【絶対に含めないもの】
-- 工事名・案件名（例：第2ファミーレマンション改修工事）
-- 工事場所・施工箇所の場所名（例：バルコニー、共用部、PS）
-- 会社名・施工会社名
-- 日付
+黒板がない場合は {"category": null, "phase": null} を返してください。
+必ずJSONのみで返してください。説明文不要。
 
-【抽出するもの】
-- 作業の種類・工程名のみ（例：下塗り、上塗り、シール施工、高圧洗浄、プライマー塗布）
-
-黒板がない、または工程名が読み取れない場合は「なし」とだけ答えてください。
-工程名が読み取れた場合はその工程名だけを短く答えてください。余計な説明は不要です。
-例：「トップコート」「下地処理」「高圧洗浄」「シール施工完了」など`,
+返す形式: {"category": "塗装工事", "phase": "分電盤 下塗り"}`,
           },
         ],
       }],
     })
 
-    const text = response.content[0].type === 'text' ? response.content[0].text.trim() : 'なし'
-    const phase = text === 'なし' ? null : text
+    const text = response.content[0].type === 'text' ? response.content[0].text.trim() : ''
 
-    return NextResponse.json({ phase })
+    try {
+      const jsonMatch = text.match(/\{[\s\S]*\}/)
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[0])
+        return NextResponse.json({
+          phase: parsed.phase ?? null,
+          category: parsed.category ?? null,
+        })
+      }
+    } catch {
+      // JSON解析失敗時はテキストをそのままphaseとして使う
+    }
+
+    // フォールバック：旧形式（テキストのみ）
+    const phase = text === 'なし' || !text ? null : text
+    return NextResponse.json({ phase, category: null })
+
   } catch (error) {
     console.error(error)
-    return NextResponse.json({ phase: null })
+    return NextResponse.json({ phase: null, category: null })
   }
 }
