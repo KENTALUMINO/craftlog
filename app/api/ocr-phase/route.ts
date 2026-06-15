@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
     const contentType = imageRes.headers.get('content-type') || 'image/jpeg'
 
     const standardPhasesText = standardPhases.length > 0
-      ? `\n\n【標準工程名リスト】（作業名はこの中から選ぶ）\n${standardPhases.join('\n')}`
+      ? `\n\n【標準工程名リスト】（phaseはこの中から最も近いものを選ぶ）\n${standardPhases.join('\n')}`
       : ''
 
     const response = await client.messages.create({
@@ -50,17 +50,23 @@ export async function POST(req: NextRequest) {
             text: `この写真に工事黒板（デジタル黒板含む）が写っている場合、以下の2つを読み取ってください。${standardPhasesText}
 
 【読み取る項目】
-1. category（大工程）: 工事の大きな種類。例：「塗装工事」「長尺シート工事」「爆裂補修」「防水工事」
-2. phase（作業名）: 「工事場所や対象物 ＋ 具体的な作業」の形で。例：「廊下 シート裁断」「分電盤 下塗り」「バルコニー 端末シール」${standardPhases.length > 0 ? '\n   ※作業名は標準工程名リストから最も近いものを選ぶ' : ''}
 
-【除外するもの】
-- 工事件名・案件名（第2ファミール等）
-- 会社名・日付
+1. category（グループ分けに使う）
+   優先順位：
+   ① 黒板に「工事場所」の記載があれば → その値（例：「廊下」「バルコニー」「外回り」「玄関」）
+   ② 工事場所がなければ → 工事の大きな種類（例：「塗装工事」「長尺シート工事」「防水工事」）
+   ③ どちらもなければ → null
+
+2. phase（具体的な作業名）
+   - 「今何をしているか」を表す最も具体的な言葉
+   - 工事件名・案件名・会社名・日付は除く
+   - 短く（10文字以内が理想）${standardPhases.length > 0 ? '\n   - 標準工程名リストから最も近いものを選ぶ' : ''}
+   - 例：「シート裁断」「下塗り」「端末シール」「ケレン」
 
 黒板がない場合は {"category": null, "phase": null} を返してください。
-必ずJSONのみで返してください。説明文不要。
+JSONのみ返してください。説明文不要。
 
-返す形式: {"category": "塗装工事", "phase": "分電盤 下塗り"}`,
+返す形式: {"category": "廊下", "phase": "シート裁断"}`,
           },
         ],
       }],
