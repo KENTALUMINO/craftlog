@@ -33,6 +33,18 @@ export default function DashboardPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/login'); return }
       setUserEmail(user.email ?? '')
+
+      // オンボーディング未完了なら設定画面へ
+      const { data: company } = await supabase
+        .from('companies')
+        .select('onboarded')
+        .eq('user_id', user.id)
+        .single()
+      if (!company || !company.onboarded) {
+        router.push('/onboarding')
+        return
+      }
+
       fetchProjects()
     }
     init()
