@@ -10,6 +10,7 @@ type Company = {
   phone: string
   address: string
   report_email: string
+  google_review_url: string
 }
 
 export default function SettingsPage() {
@@ -23,6 +24,7 @@ export default function SettingsPage() {
     phone: '',
     address: '',
     report_email: '',
+    google_review_url: '',
   })
 
   useEffect(() => {
@@ -43,6 +45,7 @@ export default function SettingsPage() {
           phone: data.phone ?? '',
           address: data.address ?? '',
           report_email: data.report_email ?? '',
+          google_review_url: data.google_review_url ?? '',
         })
       }
       setLoading(false)
@@ -122,6 +125,21 @@ export default function SettingsPage() {
                 onChange={e => setForm({ ...form, address: e.target.value })}
                 className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="例：神奈川県平塚市豊田打間木611-1"
+              />
+            </div>
+          </div>
+
+          <div className="bg-white rounded-2xl border border-gray-100 p-5 space-y-4">
+            <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">Google口コミ</h2>
+            <p className="text-xs text-gray-400">アンケート回答後にお客様へ表示するGoogle口コミページのURLを設定してください。</p>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Google口コミURL</label>
+              <input
+                type="url"
+                value={form.google_review_url}
+                onChange={e => setForm({ ...form, google_review_url: e.target.value })}
+                className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="https://g.page/r/..."
               />
             </div>
           </div>
