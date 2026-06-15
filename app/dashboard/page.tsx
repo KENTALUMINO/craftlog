@@ -140,7 +140,7 @@ export default function DashboardPage() {
                     value={form.area}
                     onChange={e => setForm({ ...form, area: e.target.value })}
                     className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="例：平塚市"
+                    placeholder="例：横浜市"
                     required
                   />
                 </div>
