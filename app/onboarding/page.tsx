@@ -74,7 +74,7 @@ export default function OnboardingPage() {
                   value={form.company_name}
                   onChange={e => setForm({ ...form, company_name: e.target.value })}
                   className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="例：ハウスクラフト株式会社"
+                  placeholder="例：〇〇建設株式会社"
                   style={{ fontSize: '16px' }}
                 />
               </div>
@@ -86,7 +86,7 @@ export default function OnboardingPage() {
                   value={form.phone}
                   onChange={e => setForm({ ...form, phone: e.target.value })}
                   className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="例：0463-43-6122"
+                  placeholder="例：03-0000-0000"
                   style={{ fontSize: '16px' }}
                 />
               </div>

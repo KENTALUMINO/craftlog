@@ -102,7 +102,7 @@ export default function SettingsPage() {
                 value={form.company_name}
                 onChange={e => setForm({ ...form, company_name: e.target.value })}
                 className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="例：ハウスクラフト株式会社"
+                placeholder="例：〇〇建設株式会社"
               />
             </div>
 
@@ -113,7 +113,7 @@ export default function SettingsPage() {
                 value={form.phone}
                 onChange={e => setForm({ ...form, phone: e.target.value })}
                 className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="例：0463-43-6122"
+                placeholder="例：03-0000-0000"
               />
             </div>
 
@@ -124,7 +124,7 @@ export default function SettingsPage() {
                 value={form.address}
                 onChange={e => setForm({ ...form, address: e.target.value })}
                 className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="例：神奈川県平塚市豊田打間木611-1"
+                placeholder="例：東京都〇〇区〇〇1-2-3"
               />
             </div>
           </div>
