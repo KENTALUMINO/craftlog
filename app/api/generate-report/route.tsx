@@ -177,10 +177,15 @@ export async function POST(req: NextRequest) {
       </Document>
     )
 
-    // メール送信（PDF添付）
+    // 送信先：登録メール必須 + お客様メール（あれば追加）
+    const toAddresses = [userEmail]
+    if (project.customer_email && project.customer_email !== userEmail) {
+      toAddresses.push(project.customer_email)
+    }
+
     await resend.emails.send({
       from: 'onboarding@resend.dev',
-      to: userEmail,
+      to: toAddresses,
       subject: `【完工報告書】${project.case_name} ${project.work_type}`,
       html: `<p>${project.case_name}の完工報告書を添付にてお送りします。</p>`,
       attachments: [{

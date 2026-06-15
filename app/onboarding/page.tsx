@@ -19,17 +19,16 @@ export default function OnboardingPage() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
 
-    const { data: existing, error: selectError } = await supabase
+    const { data: existing } = await supabase
       .from('companies')
       .select('id')
       .eq('user_id', user.id)
-      .single()
-
-    alert(`SELECT結果: existing=${JSON.stringify(existing)}, error=${JSON.stringify(selectError)}`)
+      .maybeSingle()
 
     const payload = {
       company_name: form.company_name,
       phone: form.phone,
+      email: user.email,
       google_review_url: skip ? '' : form.google_review_url,
       onboarded: true,
       user_id: user.id,
@@ -37,11 +36,9 @@ export default function OnboardingPage() {
 
     if (existing) {
       const { error } = await supabase.from('companies').update(payload).eq('user_id', user.id)
-      alert(`UPDATE error: ${JSON.stringify(error)}`)
       if (error) { setSaving(false); return }
     } else {
       const { error } = await supabase.from('companies').insert(payload)
-      alert(`INSERT error: ${JSON.stringify(error)}`)
       if (error) { setSaving(false); return }
     }
 
