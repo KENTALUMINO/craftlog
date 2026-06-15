@@ -35,6 +35,24 @@ const StepBar = ({ current }: { current: number }) => (
   </div>
 )
 
+// 工程の写真サムネイルを横並びで表示するコンポーネント
+const PhaseThumbs = ({ paths, getUrl }: { paths: string[]; getUrl: (p: string) => string }) => (
+  <div className="flex gap-1.5 mt-2 overflow-x-auto pb-1">
+    {paths.slice(0, 5).map((path, i) => (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img key={i} src={getUrl(path)} alt=""
+        className="w-16 h-12 object-cover rounded flex-shrink-0"
+        style={{ border: '1px solid var(--cl-border)' }} />
+    ))}
+    {paths.length > 5 && (
+      <div className="w-16 h-12 rounded flex-shrink-0 flex items-center justify-center text-xs font-medium"
+        style={{ background: 'var(--cl-bg)', border: '1px solid var(--cl-border)', color: 'var(--cl-text-muted)' }}>
+        +{paths.length - 5}枚
+      </div>
+    )}
+  </div>
+)
+
 export default function OrderPage() {
   const params = useParams()
   const id = params.id as string
@@ -42,6 +60,9 @@ export default function OrderPage() {
 
   const [project, setProject] = useState<Project | null>(null)
   const [allPhases, setAllPhases] = useState<string[]>([])
+  const [photosByPhase, setPhotosByPhase] = useState<Record<string, string[]>>({})
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const getThumbUrl = (path: string) => `${supabaseUrl}/storage/v1/object/public/photos/${path}`
   const [categories, setCategories] = useState<Category[]>([])
   // 未分類の工程の順番（タップで決める）
   const [uncatOrdered, setUncatOrdered] = useState<string[]>([])
@@ -82,10 +103,18 @@ export default function OrderPage() {
         if (Array.isArray(proj.phase_order)) setUncatOrdered(proj.phase_order)
       }
 
-      const { data: photos } = await supabase.from('photos').select('phase').eq('project_id', id)
+      const { data: photos } = await supabase.from('photos').select('phase, storage_path').eq('project_id', id)
       if (photos) {
         const detected = [...new Set(photos.map(p => p.phase).filter(Boolean))] as string[]
         setAllPhases(detected)
+        // 工程ごとに写真パスをまとめる（サムネイル表示用）
+        const grouped: Record<string, string[]> = {}
+        for (const p of photos) {
+          if (!p.phase || !p.storage_path) continue
+          if (!grouped[p.phase]) grouped[p.phase] = []
+          grouped[p.phase].push(p.storage_path)
+        }
+        setPhotosByPhase(grouped)
       }
     }
     init()
@@ -247,10 +276,10 @@ export default function OrderPage() {
                   <p className="text-xs py-3 text-center" style={{ color: 'var(--cl-text-muted)' }}>全工程がカテゴリーに割り当てられています</p>
                 )}
                 {uncategorized.map(phase => (
-                  <div key={phase} className="rounded-xl px-4 py-3 flex items-center gap-2"
+                  <div key={phase} className="rounded-xl px-4 py-3"
                     style={{ background: 'var(--cl-surface)', border: '1px solid var(--cl-border)' }}>
                     {renamingPhase === phase ? (
-                      <div className="flex-1 flex gap-2">
+                      <div className="flex gap-2">
                         <input
                           autoFocus
                           value={renameValue}
@@ -272,18 +301,28 @@ export default function OrderPage() {
                       </div>
                     ) : (
                       <>
-                        <span className="flex-1 text-sm font-medium" style={{ color: 'var(--cl-text)' }}>{phase}</span>
-                        <button onClick={() => { setRenamingPhase(phase); setRenameValue(phase) }}
-                          className="text-xs px-2.5 py-1 rounded-lg"
-                          style={{ background: 'var(--cl-bg)', color: 'var(--cl-text-muted)', border: '1px solid var(--cl-border)' }}>
-                          ✏ 名前変更
-                        </button>
-                        {categories.length > 0 && (
-                          <button onClick={() => setAssigningPhase(phase)}
-                            className="text-xs px-2.5 py-1 rounded-lg"
-                            style={{ background: 'var(--cl-bg)', color: 'var(--cl-orange)', border: '1px solid var(--cl-orange)' }}>
-                            📁 移動
+                        <div className="flex items-center gap-2">
+                          <span className="flex-1 text-sm font-medium" style={{ color: 'var(--cl-text)' }}>
+                            {phase}
+                            <span className="ml-1.5 text-xs" style={{ color: 'var(--cl-text-muted)' }}>
+                              {photosByPhase[phase]?.length ?? 0}枚
+                            </span>
+                          </span>
+                          <button onClick={() => { setRenamingPhase(phase); setRenameValue(phase) }}
+                            className="text-xs px-2.5 py-1 rounded-lg flex-shrink-0"
+                            style={{ background: 'var(--cl-bg)', color: 'var(--cl-text-muted)', border: '1px solid var(--cl-border)' }}>
+                            ✏ 名前変更
                           </button>
+                          {categories.length > 0 && (
+                            <button onClick={() => setAssigningPhase(phase)}
+                              className="text-xs px-2.5 py-1 rounded-lg flex-shrink-0"
+                              style={{ background: 'var(--cl-bg)', color: 'var(--cl-orange)', border: '1px solid var(--cl-orange)' }}>
+                              📁 移動
+                            </button>
+                          )}
+                        </div>
+                        {photosByPhase[phase] && (
+                          <PhaseThumbs paths={photosByPhase[phase]} getUrl={getThumbUrl} />
                         )}
                       </>
                     )}
@@ -339,10 +378,10 @@ export default function OrderPage() {
                     </p>
                   )}
                   {cat.phases.map(phase => (
-                    <div key={phase} className="px-4 py-3 flex items-center gap-2"
+                    <div key={phase} className="px-4 py-3"
                       style={{ background: 'var(--cl-surface)' }}>
                       {renamingPhase === phase ? (
-                        <div className="flex-1 flex gap-2">
+                        <div className="flex gap-2">
                           <input
                             autoFocus
                             value={renameValue}
@@ -364,17 +403,27 @@ export default function OrderPage() {
                         </div>
                       ) : (
                         <>
-                          <span className="flex-1 text-sm" style={{ color: 'var(--cl-text)' }}>{phase}</span>
-                          <button onClick={() => { setRenamingPhase(phase); setRenameValue(phase) }}
-                            className="text-xs px-2.5 py-1 rounded-lg"
-                            style={{ background: 'var(--cl-bg)', color: 'var(--cl-text-muted)', border: '1px solid var(--cl-border)' }}>
-                            ✏
-                          </button>
-                          <button onClick={() => handleRemoveFromCat(phase, cat.id)}
-                            className="text-xs px-2.5 py-1 rounded-lg"
-                            style={{ color: 'var(--cl-text-muted)' }}>
-                            ← 外す
-                          </button>
+                          <div className="flex items-center gap-2">
+                            <span className="flex-1 text-sm" style={{ color: 'var(--cl-text)' }}>
+                              {phase}
+                              <span className="ml-1.5 text-xs" style={{ color: 'var(--cl-text-muted)' }}>
+                                {photosByPhase[phase]?.length ?? 0}枚
+                              </span>
+                            </span>
+                            <button onClick={() => { setRenamingPhase(phase); setRenameValue(phase) }}
+                              className="text-xs px-2.5 py-1 rounded-lg flex-shrink-0"
+                              style={{ background: 'var(--cl-bg)', color: 'var(--cl-text-muted)', border: '1px solid var(--cl-border)' }}>
+                              ✏
+                            </button>
+                            <button onClick={() => handleRemoveFromCat(phase, cat.id)}
+                              className="text-xs px-2.5 py-1 rounded-lg flex-shrink-0"
+                              style={{ color: 'var(--cl-text-muted)' }}>
+                              ← 外す
+                            </button>
+                          </div>
+                          {photosByPhase[phase] && (
+                            <PhaseThumbs paths={photosByPhase[phase]} getUrl={getThumbUrl} />
+                          )}
                         </>
                       )}
                     </div>
