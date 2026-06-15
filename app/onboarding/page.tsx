@@ -19,11 +19,7 @@ export default function OnboardingPage() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
 
-    const { data: existing } = await supabase
-      .from('companies')
-      .select('id')
-      .eq('user_id', user.id)
-      .maybeSingle()
+    const { data: existing } = await supabase.from('companies').select('id').eq('user_id', user.id).maybeSingle()
 
     const payload = {
       company_name: form.company_name,
@@ -47,106 +43,120 @@ export default function OnboardingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
-      <div className="bg-white rounded-2xl border border-gray-100 p-8 max-w-md w-full">
+    <div className="min-h-screen flex" style={{ background: 'var(--cl-bg)' }}>
 
-        {/* ステップインジケーター */}
-        <div className="flex items-center gap-2 mb-8">
-          {[1, 2].map((s) => (
-            <div key={s} className="flex items-center gap-2 flex-1">
-              <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${
-                step >= s ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-400'
-              }`}>
-                {step > s ? '✓' : s}
-              </div>
-              {s < 2 && <div className="flex-1 h-px bg-gray-200" />}
-            </div>
-          ))}
+      {/* 左：ブランドパネル */}
+      <div className="hidden md:flex flex-col justify-between w-2/5 p-12" style={{ background: 'var(--cl-text)' }}>
+        <div className="flex items-center gap-2.5">
+          <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+            <rect width="28" height="28" rx="7" fill="var(--cl-orange)" />
+            <path d="M7 21 L14 8 L21 21" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+            <path d="M10 17 H18" stroke="#fff" strokeWidth="2" strokeLinecap="round"/>
+          </svg>
+          <span className="font-bold text-lg tracking-wide" style={{ color: '#fff' }}>CraftLog</span>
         </div>
+        <div>
+          <p className="text-3xl font-bold leading-snug mb-4" style={{ color: '#fff' }}>
+            まずは会社情報を<br />設定しましょう。
+          </p>
+          <p className="text-sm leading-relaxed" style={{ color: 'rgba(255,255,255,0.5)' }}>
+            完工報告書やアンケートに使われます。<br />あとからいつでも変更できます。
+          </p>
+        </div>
+        <p className="text-xs" style={{ color: 'rgba(255,255,255,0.3)' }}>© 2025 CraftLog</p>
+      </div>
 
-        {step === 1 && (
-          <>
-            <h1 className="text-xl font-bold text-gray-900 mb-1">会社情報を設定しましょう</h1>
-            <p className="text-sm text-gray-400 mb-6">完工報告書やアンケートに使われます。あとから変更できます。</p>
+      {/* 右：フォーム */}
+      <div className="flex-1 flex items-center justify-center p-8">
+        <div className="w-full max-w-sm">
 
-            <div className="space-y-4 mb-8">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">会社名 <span className="text-red-400">*</span></label>
-                <input
-                  type="text"
-                  value={form.company_name}
-                  onChange={e => setForm({ ...form, company_name: e.target.value })}
-                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="例：〇〇建設株式会社"
-                  style={{ fontSize: '16px' }}
-                />
+          {/* モバイル用ロゴ */}
+          <div className="flex items-center gap-2 mb-8 md:hidden">
+            <svg width="26" height="26" viewBox="0 0 26 26" fill="none">
+              <rect width="26" height="26" rx="6" fill="var(--cl-orange)" />
+              <path d="M6 19 L13 7 L20 19" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+              <path d="M9.5 15 H16.5" stroke="#fff" strokeWidth="2" strokeLinecap="round"/>
+            </svg>
+            <span className="font-bold text-base" style={{ color: 'var(--cl-text)' }}>CraftLog</span>
+          </div>
+
+          {/* ステップインジケーター */}
+          <div className="flex items-center gap-2 mb-8">
+            {[1, 2].map((s) => (
+              <div key={s} className="flex items-center gap-2 flex-1">
+                <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${
+                  step > s ? 'cl-step-done' : step === s ? 'cl-step-active' : 'cl-step-idle'
+                }`}>
+                  {step > s ? '✓' : s}
+                </div>
+                {s < 2 && <div className="flex-1 h-px" style={{ background: 'var(--cl-border)' }} />}
+              </div>
+            ))}
+          </div>
+
+          {step === 1 && (
+            <>
+              <h1 className="text-xl font-bold mb-1" style={{ color: 'var(--cl-text)' }}>会社情報を設定</h1>
+              <p className="text-sm mb-7" style={{ color: 'var(--cl-text-muted)' }}>完工報告書やアンケートに使われます。あとから変更できます。</p>
+
+              <div className="space-y-4 mb-7">
+                <div>
+                  <label className="cl-label">会社名 <span style={{ color: 'var(--cl-orange)' }}>*</span></label>
+                  <input type="text" value={form.company_name}
+                    onChange={e => setForm({ ...form, company_name: e.target.value })}
+                    className="cl-input" placeholder="例：〇〇建設株式会社"
+                    style={{ fontSize: '16px' }} />
+                </div>
+                <div>
+                  <label className="cl-label">電話番号</label>
+                  <input type="tel" value={form.phone}
+                    onChange={e => setForm({ ...form, phone: e.target.value })}
+                    className="cl-input" placeholder="例：03-0000-0000"
+                    style={{ fontSize: '16px' }} />
+                </div>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">電話番号</label>
-                <input
-                  type="tel"
-                  value={form.phone}
-                  onChange={e => setForm({ ...form, phone: e.target.value })}
-                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="例：03-0000-0000"
-                  style={{ fontSize: '16px' }}
-                />
+              <button onClick={() => setStep(2)} disabled={!form.company_name.trim()} className="cl-btn-orange">
+                次へ →
+              </button>
+            </>
+          )}
+
+          {step === 2 && (
+            <>
+              <h1 className="text-xl font-bold mb-1" style={{ color: 'var(--cl-text)' }}>Google口コミのURLを設定</h1>
+              <p className="text-sm mb-6" style={{ color: 'var(--cl-text-muted)' }}>
+                工事後のアンケート回答時に、お客様をGoogle口コミへ誘導できます。
+              </p>
+
+              <div className="mb-4">
+                <label className="cl-label">Google口コミURL</label>
+                <input type="url" value={form.google_review_url}
+                  onChange={e => setForm({ ...form, google_review_url: e.target.value })}
+                  className="cl-input" placeholder="https://g.page/r/..."
+                  style={{ fontSize: '16px' }} />
               </div>
-            </div>
 
-            <button
-              onClick={() => setStep(2)}
-              disabled={!form.company_name.trim()}
-              className="w-full bg-blue-600 text-white rounded-xl py-4 text-sm font-medium disabled:opacity-40 transition hover:bg-blue-700"
-            >
-              次へ →
-            </button>
-          </>
-        )}
+              <div className="rounded-lg px-4 py-3 mb-7 text-xs leading-relaxed"
+                style={{ background: 'var(--cl-orange-light)', color: 'var(--cl-orange-dark)' }}>
+                <strong>URLの取得方法：</strong><br />
+                Googleマップで自社を検索 → 「口コミを書く」ボタンを右クリック → 「リンクをコピー」
+              </div>
 
-        {step === 2 && (
-          <>
-            <h1 className="text-xl font-bold text-gray-900 mb-1">Google口コミのURLを設定</h1>
-            <p className="text-sm text-gray-400 mb-6">
-              工事後のアンケート回答時に、お客様をGoogle口コミへ誘導できます。
-              Googleビジネスプロフィールの「口コミを書く」リンクを貼り付けてください。
-            </p>
+              <button onClick={() => handleSave(false)}
+                disabled={!form.google_review_url.trim() || saving}
+                className="cl-btn-orange mb-3">
+                {saving ? '保存中...' : '設定して始める'}
+              </button>
 
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Google口コミURL</label>
-              <input
-                type="url"
-                value={form.google_review_url}
-                onChange={e => setForm({ ...form, google_review_url: e.target.value })}
-                className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="https://g.page/r/..."
-                style={{ fontSize: '16px' }}
-              />
-            </div>
-
-            <div className="bg-blue-50 rounded-xl p-4 mb-8 text-xs text-blue-700 leading-relaxed">
-              <strong>URLの取得方法：</strong><br />
-              Googleマップで自社を検索 → 「口コミを書く」ボタンを右クリック → 「リンクをコピー」
-            </div>
-
-            <button
-              onClick={() => handleSave(false)}
-              disabled={!form.google_review_url.trim() || saving}
-              className="w-full bg-blue-600 text-white rounded-xl py-4 text-sm font-medium disabled:opacity-40 transition hover:bg-blue-700 mb-3"
-            >
-              {saving ? '保存中...' : '設定して始める'}
-            </button>
-
-            <button
-              onClick={() => handleSave(true)}
-              disabled={saving}
-              className="w-full text-gray-400 text-sm py-2 hover:text-gray-600 transition"
-            >
-              スキップしてダッシュボードへ
-            </button>
-          </>
-        )}
+              <button onClick={() => handleSave(true)} disabled={saving}
+                className="w-full text-sm py-2 transition"
+                style={{ color: 'var(--cl-text-muted)' }}>
+                スキップしてダッシュボードへ
+              </button>
+            </>
+          )}
+        </div>
       </div>
     </div>
   )

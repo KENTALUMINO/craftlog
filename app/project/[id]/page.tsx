@@ -4,22 +4,30 @@ import { useEffect, useState, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter, useParams } from 'next/navigation'
 
-type Photo = {
-  id: string
-  phase: string | null
-  storage_path: string
-  original_name: string
-  url?: string
-}
-
-type Project = {
-  id: string
-  case_name: string
-  work_type: string
-  area: string
-}
+type Photo = { id: string; phase: string | null; storage_path: string; original_name: string; url?: string }
+type Project = { id: string; case_name: string; work_type: string; area: string }
 
 const STEPS = ['工程管理', '並び替え', '完工報告書', 'ブログ']
+
+const StepBar = ({ current }: { current: number }) => (
+  <div style={{ background: 'var(--cl-surface)', borderBottom: '1px solid var(--cl-border)' }} className="px-4 py-3">
+    <div className="flex items-center max-w-2xl mx-auto">
+      {STEPS.map((step, i) => (
+        <div key={step} className="flex items-center flex-1">
+          <div className="flex items-center gap-1.5">
+            <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+              i < current ? 'cl-step-done' : i === current ? 'cl-step-active' : 'cl-step-idle'
+            }`}>
+              {i < current ? '✓' : i + 1}
+            </div>
+            <span className="text-xs font-medium hidden sm:block" style={{ color: i === current ? 'var(--cl-orange)' : i < current ? 'var(--cl-green)' : 'var(--cl-text-muted)' }}>{step}</span>
+          </div>
+          {i < STEPS.length - 1 && <div className="flex-1 h-px mx-2" style={{ background: 'var(--cl-border)' }} />}
+        </div>
+      ))}
+    </div>
+  </div>
+)
 
 export default function ProjectPage() {
   const params = useParams()
@@ -32,7 +40,6 @@ export default function ProjectPage() {
   const [uploading, setUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
   const [ocrLoading, setOcrLoading] = useState(false)
-
   const [pendingPhotos, setPendingPhotos] = useState<Photo[]>([])
   const [showPhaseInput, setShowPhaseInput] = useState(false)
   const [phaseInput, setPhaseInput] = useState('')
@@ -54,8 +61,7 @@ export default function ProjectPage() {
   }
 
   const fetchPhotos = async () => {
-    const { data } = await supabase
-      .from('photos').select('*').eq('project_id', id).order('created_at', { ascending: true })
+    const { data } = await supabase.from('photos').select('*').eq('project_id', id).order('created_at', { ascending: true })
     if (data) {
       const withUrls = await Promise.all(data.map(async (p) => {
         const { data: urlData } = supabase.storage.from('photos').getPublicUrl(p.storage_path)
@@ -70,7 +76,6 @@ export default function ProjectPage() {
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || [])
     if (files.length === 0) return
-
     setUploading(true)
     setUploadProgress(0)
     const { data: { user } } = await supabase.auth.getUser()
@@ -115,7 +120,6 @@ export default function ProjectPage() {
       } catch { needsManual.push(photo) }
     }
     setOcrLoading(false)
-
     if (needsManual.length > 0) {
       setPendingPhotos(needsManual)
       setShowPhaseInput(true)
@@ -147,91 +151,79 @@ export default function ProjectPage() {
   }, {} as Record<string, Photo[]>)
 
   if (!project) return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center text-gray-400">読み込み中...</div>
+    <div className="min-h-screen flex items-center justify-center text-sm" style={{ background: 'var(--cl-bg)', color: 'var(--cl-text-muted)' }}>読み込み中...</div>
   )
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b border-gray-100 px-4 py-4 flex items-center gap-3">
-        <button onClick={() => router.push('/dashboard')} className="flex items-center gap-1.5 text-sm font-medium text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition-colors">
-          <span>←</span>
-          <span>一覧に戻る</span>
+    <div className="min-h-screen" style={{ background: 'var(--cl-bg)' }}>
+
+      {/* ヘッダー */}
+      <header style={{ background: 'var(--cl-surface)', borderBottom: '1px solid var(--cl-border)' }} className="px-4 py-4 flex items-center gap-3">
+        <button onClick={() => router.push('/dashboard')}
+          className="flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-lg transition"
+          style={{ color: 'var(--cl-orange)', background: 'var(--cl-orange-light)' }}>
+          ← 一覧に戻る
         </button>
         <div>
-          <h1 className="text-base font-bold text-gray-900">{project.case_name}</h1>
-          <p className="text-xs text-gray-500">{project.work_type}　{project.area}</p>
+          <h1 className="text-base font-bold" style={{ color: 'var(--cl-text)' }}>{project.case_name}</h1>
+          <p className="text-xs" style={{ color: 'var(--cl-text-muted)' }}>{project.work_type}　{project.area}</p>
         </div>
       </header>
 
-      {/* ステップバー */}
-      <div className="bg-white border-b border-gray-100 px-4 py-3">
-        <div className="flex items-center max-w-2xl mx-auto">
-          {STEPS.map((step, i) => (
-            <div key={step} className="flex items-center flex-1">
-              <div className={`flex items-center gap-1.5 ${i === 0 ? 'text-blue-600' : 'text-gray-300'}`}>
-                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${i === 0 ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-400'}`}>
-                  {i + 1}
-                </div>
-                <span className="text-xs font-medium hidden sm:block">{step}</span>
-              </div>
-              {i < STEPS.length - 1 && <div className="flex-1 h-px bg-gray-200 mx-2" />}
-            </div>
-          ))}
-        </div>
-      </div>
+      <StepBar current={0} />
 
       <main className="max-w-2xl mx-auto px-4 py-6">
 
+        {/* OCR読み取り中オーバーレイ */}
         {ocrLoading && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-2xl px-8 py-6 text-center">
-              <p className="text-sm text-gray-600">🔍 黒板を読み取り中...</p>
+            <div className="cl-card px-8 py-6 text-center">
+              <p className="text-sm" style={{ color: 'var(--cl-text-sub)' }}>黒板を読み取り中...</p>
             </div>
           </div>
         )}
 
+        {/* 工程名入力モーダル */}
         {showPhaseInput && (
           <div className="fixed inset-0 bg-black/50 flex items-end justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl w-full max-w-md p-6">
-              <h3 className="text-base font-bold text-gray-900 mb-1">工程名を入力</h3>
-              <p className="text-xs text-gray-500 mb-4">{pendingPhotos.length}枚の写真に工程名を設定します</p>
+            <div className="cl-card w-full max-w-md p-6">
+              <h3 className="text-base font-bold mb-1" style={{ color: 'var(--cl-text)' }}>工程名を入力</h3>
+              <p className="text-xs mb-4" style={{ color: 'var(--cl-text-muted)' }}>{pendingPhotos.length}枚の写真に工程名を設定します</p>
               <div className="flex gap-2 mb-4 overflow-x-auto">
                 {pendingPhotos.slice(0, 4).map(p => (
-                  <div key={p.id} className="w-16 h-16 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
+                  <div key={p.id} className="w-16 h-16 rounded-lg overflow-hidden flex-shrink-0" style={{ background: 'var(--cl-bg)' }}>
                     {p.url && <img src={p.url} alt="" className="w-full h-full object-cover" />}
                   </div>
                 ))}
                 {pendingPhotos.length > 4 && (
-                  <div className="w-16 h-16 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0 text-xs text-gray-500">
+                  <div className="w-16 h-16 rounded-lg flex items-center justify-center flex-shrink-0 text-xs" style={{ background: 'var(--cl-bg)', color: 'var(--cl-text-muted)' }}>
                     +{pendingPhotos.length - 4}
                   </div>
                 )}
               </div>
               {pastPhases.length > 0 && (
                 <div className="mb-3">
-                  <p className="text-xs text-gray-400 mb-2">過去の工程名から選ぶ</p>
+                  <p className="text-xs mb-2" style={{ color: 'var(--cl-text-muted)' }}>過去の工程名から選ぶ</p>
                   <div className="flex flex-wrap gap-2">
                     {pastPhases.map(phase => (
                       <button key={phase} onClick={() => handleAssignPhase(phase)}
-                        className="text-xs bg-gray-100 text-gray-700 rounded-full px-3 py-1.5 hover:bg-blue-50 hover:text-blue-600 transition">
+                        className="text-xs rounded-full px-3 py-1.5 transition"
+                        style={{ background: 'var(--cl-bg)', color: 'var(--cl-text-sub)', border: '1px solid var(--cl-border)' }}>
                         {phase}
                       </button>
                     ))}
                   </div>
                 </div>
               )}
-              {phaseInput && <p className="text-xs text-indigo-500 mb-1">🔍 黒板から自動検出しました。修正もできます。</p>}
               <input
                 type="text" value={phaseInput} onChange={e => setPhaseInput(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && handleAssignPhase(phaseInput)}
-                className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 mb-3"
+                className="cl-input mb-3"
                 placeholder="例：高圧洗浄、下地補修..." autoFocus style={{ fontSize: '16px' }}
               />
               <div className="flex gap-2">
-                <button onClick={() => { setShowPhaseInput(false); fetchPhotos() }}
-                  className="flex-1 border border-gray-200 text-gray-600 rounded-xl py-3 text-sm">後で設定</button>
-                <button onClick={() => handleAssignPhase(phaseInput)} disabled={!phaseInput.trim()}
-                  className="flex-1 bg-blue-600 text-white rounded-xl py-3 text-sm font-medium disabled:opacity-40">設定する</button>
+                <button onClick={() => { setShowPhaseInput(false); fetchPhotos() }} className="cl-btn-ghost flex-1">後で設定</button>
+                <button onClick={() => handleAssignPhase(phaseInput)} disabled={!phaseInput.trim()} className="cl-btn-orange flex-1">設定する</button>
               </div>
             </div>
           </div>
@@ -239,57 +231,66 @@ export default function ProjectPage() {
 
         {/* アップロードボタン */}
         <div onClick={() => fileInputRef.current?.click()}
-          className="bg-blue-600 text-white rounded-xl py-5 text-center cursor-pointer hover:bg-blue-700 transition mb-4">
-          <p className="text-2xl mb-1">📷</p>
-          <p className="font-medium">写真を選んで送信</p>
-          <p className="text-xs text-blue-200 mt-1">黒板があれば工程名を自動検出します</p>
+          className="rounded-xl py-6 text-center cursor-pointer transition mb-5"
+          style={{ background: 'var(--cl-orange)', color: '#fff' }}>
+          <svg width="32" height="32" viewBox="0 0 32 32" fill="none" className="mx-auto mb-2">
+            <circle cx="16" cy="16" r="14" stroke="rgba(255,255,255,0.4)" strokeWidth="1.5"/>
+            <path d="M16 10 v12 M10 16 h12" stroke="#fff" strokeWidth="2.2" strokeLinecap="round"/>
+          </svg>
+          <p className="font-semibold text-sm">写真を選んで送信</p>
+          <p className="text-xs mt-1" style={{ color: 'rgba(255,255,255,0.7)' }}>黒板があれば工程名を自動検出します</p>
         </div>
 
         <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleUpload} />
 
+        {/* アップロード進捗 */}
         {uploading && (
-          <div className="bg-white rounded-xl border border-gray-100 p-4 mb-4">
-            <div className="flex justify-between text-sm text-gray-600 mb-2">
+          <div className="cl-card p-4 mb-4">
+            <div className="flex justify-between text-sm mb-2" style={{ color: 'var(--cl-text-sub)' }}>
               <span>アップロード中...</span><span>{uploadProgress}%</span>
             </div>
-            <div className="w-full bg-gray-100 rounded-full h-2">
-              <div className="bg-blue-600 h-2 rounded-full transition-all" style={{ width: `${uploadProgress}%` }} />
+            <div className="w-full rounded-full h-1.5" style={{ background: 'var(--cl-border)' }}>
+              <div className="h-1.5 rounded-full transition-all" style={{ width: `${uploadProgress}%`, background: 'var(--cl-orange)' }} />
             </div>
           </div>
         )}
 
+        {/* 空状態 */}
         {photos.length === 0 && !uploading && (
-          <div className="text-center py-16 text-gray-400 text-sm">写真がまだありません。上のボタンから送信してください。</div>
+          <div className="text-center py-12 text-sm" style={{ color: 'var(--cl-text-muted)' }}>
+            写真がまだありません。上のボタンから送信してください。
+          </div>
         )}
 
+        {/* 写真グループ */}
         {Object.entries(groupedPhotos).map(([phase, phasePhotos]) => (
           <div key={phase} className="mb-6">
             <div className="flex items-center gap-2 mb-3">
-              <span className={`text-xs px-3 py-1 rounded-full font-medium ${phase === '未分類' ? 'bg-orange-50 text-orange-600' : 'bg-green-50 text-green-600'}`}>
+              <span className="text-xs px-3 py-1 rounded-full font-medium"
+                style={phase === '未分類'
+                  ? { background: 'var(--cl-orange-light)', color: 'var(--cl-orange)' }
+                  : { background: 'var(--cl-green-light)', color: 'var(--cl-green)' }}>
                 {phase}
               </span>
-              <span className="text-xs text-gray-400">{phasePhotos.length}枚</span>
+              <span className="text-xs" style={{ color: 'var(--cl-text-muted)' }}>{phasePhotos.length}枚</span>
             </div>
             <div className="grid grid-cols-3 gap-2">
               {phasePhotos.map((photo) => (
-                <div key={photo.id} className="aspect-square rounded-lg overflow-hidden bg-gray-100 relative">
+                <div key={photo.id} className="aspect-square rounded-lg overflow-hidden relative" style={{ background: 'var(--cl-border)' }}>
                   {photo.url && <img src={photo.url} alt={photo.original_name} className="w-full h-full object-cover" />}
                   <button
                     onClick={() => { if (confirm('この写真を削除しますか？')) handleDeletePhoto(photo) }}
-                    className="absolute top-1 right-1 bg-black/60 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs"
-                  >✕</button>
+                    className="absolute top-1 right-1 rounded-full w-6 h-6 flex items-center justify-center text-xs"
+                    style={{ background: 'rgba(0,0,0,0.6)', color: '#fff' }}>✕</button>
                 </div>
               ))}
             </div>
           </div>
         ))}
 
-        {/* 次のステップへ */}
+        {/* 次へ */}
         {photos.length > 0 && (
-          <button
-            onClick={() => router.push(`/project/${id}/order`)}
-            className="w-full bg-gray-900 text-white rounded-xl py-4 text-sm font-medium mt-4"
-          >
+          <button onClick={() => router.push(`/project/${id}/order`)} className="cl-btn-primary mt-4">
             次へ：工程の順番を確認する →
           </button>
         )}
