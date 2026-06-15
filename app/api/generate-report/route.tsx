@@ -49,18 +49,30 @@ export async function POST(req: NextRequest) {
     const getUrl = (path: string) =>
       `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/photos/${path}`
 
-    // 工程順に並べる
-    const phaseOrder: string[] = project.phase_order ?? []
+    // 写真を工程名でグループ化
     const grouped: Record<string, typeof photos> = {}
     for (const p of photos) {
       const phase = p.phase || '未分類'
       if (!grouped[phase]) grouped[phase] = []
       grouped[phase].push(p)
     }
-    const orderedPhases = [
-      ...phaseOrder.filter(p => grouped[p]),
-      ...Object.keys(grouped).filter(p => !phaseOrder.includes(p)),
+
+    // カテゴリー対応の工程順を組み立てる
+    // 順番：カテゴリー内工程（カテゴリー順）→ 未分類工程（phase_order順）
+    type CategoryData = { id: string; name: string; phases: string[] }
+    const savedCategories: CategoryData[] = Array.isArray(project.phase_categories) ? project.phase_categories : []
+    const categorizedPhaseSet = new Set(savedCategories.flatMap((c: CategoryData) => c.phases))
+
+    const phaseOrder: string[] = project.phase_order ?? []
+
+    // カテゴリーに属する工程を先に並べる
+    const categorizedPhases: string[] = savedCategories.flatMap((c: CategoryData) => c.phases).filter(p => grouped[p])
+    // 未分類工程（phase_orderに従う）
+    const uncategorizedPhases = [
+      ...phaseOrder.filter(p => grouped[p] && !categorizedPhaseSet.has(p)),
+      ...Object.keys(grouped).filter(p => !phaseOrder.includes(p) && !categorizedPhaseSet.has(p)),
     ]
+    const orderedPhases = [...categorizedPhases, ...uncategorizedPhases]
 
     // 複数工程をbin-packingで1ページに詰め込む（合計6枚以内）
     // 7枚以上の工程は6枚ずつ分割してから詰め込む
@@ -143,37 +155,62 @@ export async function POST(req: NextRequest) {
         </Page>
 
         {/* 施工写真ページ（複数工程をbin-packingで1ページに集約） */}
-        {pageGroups.map((pg, i) => (
-          <Page key={i} size="A4" style={styles.page}>
-            <Text style={styles.sectionTitle}>施工写真</Text>
-            {pg.phases.map((pc, pi) => {
-              // 各工程: タイトル → その工程の写真（2列16:9）
-              const label = `${pc.phase}${pc.totalChunks > 1 ? `（${pc.chunkNum}/${pc.totalChunks}）` : ''}　${grouped[pc.phase].length}枚`
-              const rows: (typeof photos)[] = []
-              for (let r = 0; r * 2 < pc.photos.length; r++) {
-                rows.push(pc.photos.slice(r * 2, r * 2 + 2))
-              }
-              return (
-                <View key={pi}>
-                  <Text style={styles.phaseTitle}>{label}</Text>
-                  <View style={{ flexDirection: 'column', gap: GAP, marginBottom: pi < pg.phases.length - 1 ? 10 : 0 }}>
-                    {rows.map((row, ri) => (
-                      <View key={ri} style={{ flexDirection: 'row', gap: GAP }}>
-                        {row.map((p) => (
-                          <Image
-                            key={p.id}
-                            src={getUrl(p.storage_path)}
-                            style={{ width: PHOTO_WIDTH, height: PHOTO_HEIGHT, objectFit: 'cover' }}
-                          />
-                        ))}
-                      </View>
-                    ))}
+        {pageGroups.map((pg, i) => {
+          // このページグループで表示する工程のカテゴリーヘッダーを判定
+          let lastCategoryName: string | null = null
+          return (
+            <Page key={i} size="A4" style={styles.page}>
+              <Text style={styles.sectionTitle}>施工写真</Text>
+              {pg.phases.map((pc, pi) => {
+                // このphaseが属するカテゴリーを探す
+                const belongsToCategory = savedCategories.find((c: CategoryData) => c.phases.includes(pc.phase))
+                const categoryName = belongsToCategory?.name ?? null
+
+                // カテゴリーが変わったときだけヘッダーを表示
+                const showCategoryHeader = categoryName && categoryName !== lastCategoryName
+                if (categoryName) lastCategoryName = categoryName
+
+                const label = `${pc.phase}${pc.totalChunks > 1 ? `（${pc.chunkNum}/${pc.totalChunks}）` : ''}　${grouped[pc.phase].length}枚`
+                const rows: (typeof photos)[] = []
+                for (let r = 0; r * 2 < pc.photos.length; r++) {
+                  rows.push(pc.photos.slice(r * 2, r * 2 + 2))
+                }
+                return (
+                  <View key={pi}>
+                    {showCategoryHeader && (
+                      <Text style={{
+                        fontSize: 13,
+                        fontFamily: 'NotoSansJP',
+                        fontWeight: 'bold',
+                        color: '#ffffff',
+                        backgroundColor: '#1f2a44',
+                        padding: '8 12',
+                        marginTop: pi > 0 ? 14 : 0,
+                        marginBottom: 4,
+                      }}>
+                        ▍ {categoryName}
+                      </Text>
+                    )}
+                    <Text style={styles.phaseTitle}>{label}</Text>
+                    <View style={{ flexDirection: 'column', gap: GAP, marginBottom: pi < pg.phases.length - 1 ? 10 : 0 }}>
+                      {rows.map((row, ri) => (
+                        <View key={ri} style={{ flexDirection: 'row', gap: GAP }}>
+                          {row.map((p) => (
+                            <Image
+                              key={p.id}
+                              src={getUrl(p.storage_path)}
+                              style={{ width: PHOTO_WIDTH, height: PHOTO_HEIGHT, objectFit: 'cover' }}
+                            />
+                          ))}
+                        </View>
+                      ))}
+                    </View>
                   </View>
-                </View>
-              )
-            })}
-          </Page>
-        ))}
+                )
+              })}
+            </Page>
+          )
+        })}
       </Document>
     )
 
@@ -183,11 +220,19 @@ export async function POST(req: NextRequest) {
       toAddresses.push(project.customer_email)
     }
 
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://craftlog.jp'
+    const surveyUrl = `${siteUrl}/survey/${projectId}`
+
     await resend.emails.send({
-      from: 'onboarding@resend.dev',
+      from: 'noreply@craftlog.jp',
       to: toAddresses,
       subject: `【完工報告書】${project.case_name} ${project.work_type}`,
-      html: `<p>${project.case_name}の完工報告書を添付にてお送りします。</p>`,
+      html: `
+<p>${project.case_name}の完工報告書を添付にてお送りします。</p>
+<p>工事はいかがでしたか？ぜひ以下のアンケートにご回答ください（1〜2分で完了します）。</p>
+<p><a href="${surveyUrl}" style="display:inline-block;padding:12px 24px;background:#1f2a44;color:#ffffff;text-decoration:none;border-radius:4px;">アンケートに回答する</a></p>
+<p style="color:#888888;font-size:12px;">上のボタンが開けない場合はこちら：${surveyUrl}</p>
+`,
       attachments: [{
         filename: `完工報告書_${project.case_name}.pdf`,
         content: pdfBuffer,
