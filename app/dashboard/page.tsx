@@ -26,6 +26,8 @@ export default function DashboardPage() {
     start_date: '',
     end_date: '',
   })
+  const [deleteTarget, setDeleteTarget] = useState<Project | null>(null)
+  const [deleting, setDeleting] = useState(false)
   const router = useRouter()
 
   useEffect(() => {
@@ -66,6 +68,31 @@ export default function DashboardPage() {
     setForm({ case_name: '', work_type: '', area: '', start_date: '', end_date: '' })
     setShowForm(false)
     setLoading(false)
+    fetchProjects()
+  }
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return
+    setDeleting(true)
+
+    // ストレージの写真ファイルを削除
+    const { data: photos } = await supabase
+      .from('photos')
+      .select('storage_path')
+      .eq('project_id', deleteTarget.id)
+    if (photos && photos.length > 0) {
+      const paths = photos.map(p => p.storage_path)
+      await supabase.storage.from('photos').remove(paths)
+    }
+
+    // DBの写真レコードを削除
+    await supabase.from('photos').delete().eq('project_id', deleteTarget.id)
+
+    // 案件を削除
+    await supabase.from('projects').delete().eq('id', deleteTarget.id)
+
+    setDeleting(false)
+    setDeleteTarget(null)
     fetchProjects()
   }
 
@@ -177,6 +204,36 @@ export default function DashboardPage() {
           </div>
         )}
 
+        {/* 削除確認モーダル */}
+        {deleteTarget && (
+          <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
+            <div className="cl-card w-full max-w-sm p-6">
+              <h3 className="text-base font-bold mb-2" style={{ color: 'var(--cl-text)' }}>削除しますか？</h3>
+              <p className="text-sm mb-1" style={{ color: 'var(--cl-text-sub)' }}>
+                <span className="font-semibold">{deleteTarget.case_name}</span> を削除します。
+              </p>
+              <p className="text-xs mb-6" style={{ color: 'var(--cl-text-muted)' }}>
+                この案件に登録されている写真もすべて削除されます。この操作は取り消せません。
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setDeleteTarget(null)}
+                  disabled={deleting}
+                  className="cl-btn-ghost flex-1">
+                  キャンセル
+                </button>
+                <button
+                  onClick={handleDelete}
+                  disabled={deleting}
+                  className="flex-1 py-2.5 rounded-xl text-sm font-semibold transition"
+                  style={{ background: '#ef4444', color: '#fff', opacity: deleting ? 0.6 : 1 }}>
+                  {deleting ? '削除中...' : '削除する'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* 案件リスト */}
         {projects.length === 0 ? (
           <div className="cl-card flex flex-col items-center justify-center py-16 px-8 text-center">
@@ -219,8 +276,8 @@ export default function DashboardPage() {
                         el.style.transform = 'translateY(0)'
                       }}
                     >
-                      <div className="flex justify-between items-center">
-                        <div>
+                      <div className="flex justify-between items-center gap-3">
+                        <div className="flex-1 min-w-0">
                           <p className="font-semibold" style={{ color: 'var(--cl-text)' }}>{p.case_name}</p>
                           <p className="text-sm mt-0.5" style={{ color: 'var(--cl-text-sub)' }}>
                             {p.work_type}　{p.area}
@@ -231,12 +288,25 @@ export default function DashboardPage() {
                             </p>
                           )}
                         </div>
-                        <div className="flex items-center gap-1 text-xs font-medium px-3 py-1.5 rounded-full"
-                          style={{ background: 'var(--cl-orange-light)', color: 'var(--cl-orange)' }}>
-                          進行中
-                          <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
-                            <path d="M4 2l4 4-4 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-                          </svg>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <div className="flex items-center gap-1 text-xs font-medium px-3 py-1.5 rounded-full"
+                            style={{ background: 'var(--cl-orange-light)', color: 'var(--cl-orange)' }}>
+                            進行中
+                            <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
+                              <path d="M4 2l4 4-4 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                            </svg>
+                          </div>
+                          <button
+                            onClick={e => { e.stopPropagation(); setDeleteTarget(p) }}
+                            className="w-8 h-8 flex items-center justify-center rounded-lg transition"
+                            style={{ color: 'var(--cl-text-muted)' }}
+                            onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#fee2e2'; (e.currentTarget as HTMLButtonElement).style.color = '#ef4444' }}
+                            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; (e.currentTarget as HTMLButtonElement).style.color = 'var(--cl-text-muted)' }}
+                            title="削除">
+                            <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+                              <path d="M2 4h12M5 4V3a1 1 0 011-1h4a1 1 0 011 1v1M6 7v5M10 7v5M3 4l1 9a1 1 0 001 1h6a1 1 0 001-1l1-9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                            </svg>
+                          </button>
                         </div>
                       </div>
                     </div>
