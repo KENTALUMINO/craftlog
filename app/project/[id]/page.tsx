@@ -44,6 +44,12 @@ export default function ProjectPage() {
   const [showPhaseInput, setShowPhaseInput] = useState(false)
   const [phaseInput, setPhaseInput] = useState('')
   const [pastPhases, setPastPhases] = useState<string[]>([])
+  const [reanalyzing, setReanalyzing] = useState(false)
+  const [reanalyzePending, setReanalyzePending] = useState<Photo[]>([])
+  const [showReanalyzeInput, setShowReanalyzeInput] = useState(false)
+  const [reanalyzePhaseInput, setReanalyzePhaseInput] = useState('')
+  const [reanalyzeCurrentIndex, setReanalyzeCurrentIndex] = useState(0)
+  const [reanalyzeSuggestion, setReanalyzeSuggestion] = useState<string | null>(null)
 
   useEffect(() => {
     const init = async () => {
@@ -147,6 +153,64 @@ export default function ProjectPage() {
     fetchPhotos()
   }
 
+  const handleReanalyze = async () => {
+    const unclassified = photos.filter(p => !p.phase)
+    if (unclassified.length === 0) return
+    setReanalyzing(true)
+
+    const existingPhases = [...new Set(photos.map(p => p.phase).filter(Boolean))] as string[]
+    const needsManual: Photo[] = []
+
+    for (const photo of unclassified) {
+      if (!photo.url) { needsManual.push(photo); continue }
+      try {
+        const res = await fetch('/api/reanalyze-photos', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ imageUrl: photo.url, existingPhases }),
+        })
+        const data = await res.json()
+        if (data.phase && data.confidence === 'high') {
+          await supabase.from('photos').update({ phase: data.phase }).eq('id', photo.id)
+        } else {
+          needsManual.push({ ...photo, _aiSuggestion: data.phase } as Photo & { _aiSuggestion: string | null })
+        }
+      } catch {
+        needsManual.push(photo)
+      }
+    }
+
+    setReanalyzing(false)
+    fetchPhotos()
+
+    if (needsManual.length > 0) {
+      setReanalyzePending(needsManual)
+      setReanalyzeCurrentIndex(0)
+      setReanalyzeSuggestion((needsManual[0] as Photo & { _aiSuggestion?: string | null })._aiSuggestion ?? null)
+      setReanalyzePhaseInput('')
+      setShowReanalyzeInput(true)
+    }
+  }
+
+  const handleReanalyzeAssign = async (phase: string) => {
+    if (!phase.trim()) return
+    const photo = reanalyzePending[reanalyzeCurrentIndex]
+    await supabase.from('photos').update({ phase }).eq('id', photo.id)
+
+    const nextIndex = reanalyzeCurrentIndex + 1
+    if (nextIndex < reanalyzePending.length) {
+      setReanalyzeCurrentIndex(nextIndex)
+      const next = reanalyzePending[nextIndex] as Photo & { _aiSuggestion?: string | null }
+      setReanalyzeSuggestion(next._aiSuggestion ?? null)
+      setReanalyzePhaseInput('')
+    } else {
+      setShowReanalyzeInput(false)
+      setReanalyzePending([])
+      setReanalyzeCurrentIndex(0)
+    }
+    fetchPhotos()
+  }
+
   const groupedPhotos = photos.reduce((acc, photo) => {
     const phase = photo.phase || '未分類'
     if (!acc[phase]) acc[phase] = []
@@ -233,6 +297,96 @@ export default function ProjectPage() {
           </div>
         )}
 
+        {/* 再分析中オーバーレイ */}
+        {reanalyzing && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div className="cl-card px-8 py-6 text-center">
+              <div className="text-2xl mb-3">🔍</div>
+              <p className="text-sm font-medium" style={{ color: 'var(--cl-text)' }}>写真の内容を分析中...</p>
+              <p className="text-xs mt-1" style={{ color: 'var(--cl-text-muted)' }}>AIが写真を見て工程を判定しています</p>
+            </div>
+          </div>
+        )}
+
+        {/* 再分析：ユーザー確認モーダル */}
+        {showReanalyzeInput && reanalyzePending[reanalyzeCurrentIndex] && (
+          <div className="fixed inset-0 bg-black/50 flex items-end justify-center z-50 p-4">
+            <div className="cl-card w-full max-w-md p-6">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-base font-bold" style={{ color: 'var(--cl-text)' }}>この写真の工程は？</h3>
+                <span className="text-xs" style={{ color: 'var(--cl-text-muted)' }}>
+                  {reanalyzeCurrentIndex + 1} / {reanalyzePending.length}枚
+                </span>
+              </div>
+              {reanalyzePending[reanalyzeCurrentIndex].url && (
+                <img
+                  src={reanalyzePending[reanalyzeCurrentIndex].url}
+                  alt=""
+                  className="w-full h-44 object-cover rounded-xl mb-4"
+                />
+              )}
+              {reanalyzeSuggestion && (
+                <div className="mb-3 px-3 py-2 rounded-lg flex items-center gap-2"
+                  style={{ background: 'var(--cl-orange-light)' }}>
+                  <span className="text-xs" style={{ color: 'var(--cl-text-muted)' }}>AIの予測：</span>
+                  <button
+                    onClick={() => handleReanalyzeAssign(reanalyzeSuggestion)}
+                    className="text-sm font-semibold"
+                    style={{ color: 'var(--cl-orange)' }}>
+                    {reanalyzeSuggestion} → これで確定
+                  </button>
+                </div>
+              )}
+              {pastPhases.length > 0 && (
+                <div className="mb-3">
+                  <p className="text-xs mb-2" style={{ color: 'var(--cl-text-muted)' }}>工程名から選ぶ</p>
+                  <div className="flex flex-wrap gap-2">
+                    {pastPhases.map(phase => (
+                      <button key={phase} onClick={() => handleReanalyzeAssign(phase)}
+                        className="text-xs rounded-full px-3 py-1.5"
+                        style={{ background: 'var(--cl-bg)', color: 'var(--cl-text-sub)', border: '1px solid var(--cl-border)' }}>
+                        {phase}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <input
+                type="text"
+                value={reanalyzePhaseInput}
+                onChange={e => setReanalyzePhaseInput(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleReanalyzeAssign(reanalyzePhaseInput)}
+                className="cl-input mb-3"
+                placeholder="工程名を直接入力..."
+                style={{ fontSize: '16px' }}
+              />
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    const nextIndex = reanalyzeCurrentIndex + 1
+                    if (nextIndex < reanalyzePending.length) {
+                      setReanalyzeCurrentIndex(nextIndex)
+                      const next = reanalyzePending[nextIndex] as Photo & { _aiSuggestion?: string | null }
+                      setReanalyzeSuggestion(next._aiSuggestion ?? null)
+                      setReanalyzePhaseInput('')
+                    } else {
+                      setShowReanalyzeInput(false)
+                    }
+                  }}
+                  className="cl-btn-ghost flex-1 text-xs">
+                  スキップ
+                </button>
+                <button
+                  onClick={() => handleReanalyzeAssign(reanalyzePhaseInput)}
+                  disabled={!reanalyzePhaseInput.trim()}
+                  className="cl-btn-orange flex-1">
+                  確定
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* アップロードボタン */}
         <div onClick={() => fileInputRef.current?.click()}
           className="rounded-xl py-6 text-center cursor-pointer transition mb-5"
@@ -246,6 +400,17 @@ export default function ProjectPage() {
         </div>
 
         <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleUpload} />
+
+        {/* 未分類写真がある場合：AIで再分析ボタン */}
+        {photos.some(p => !p.phase) && !uploading && !ocrLoading && (
+          <button
+            onClick={handleReanalyze}
+            disabled={reanalyzing}
+            className="w-full py-3 rounded-xl text-sm font-bold flex items-center justify-center gap-2 mb-4"
+            style={{ background: 'var(--cl-navy, #1f2a44)', color: '#fff', opacity: reanalyzing ? 0.6 : 1 }}>
+            🔍 未分類の写真をAIで再分析する（{photos.filter(p => !p.phase).length}枚）
+          </button>
+        )}
 
         {/* アップロード進捗 */}
         {uploading && (
