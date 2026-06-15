@@ -107,9 +107,10 @@ export default function ProjectPage() {
     for (const photo of uploaded) {
       if (!photo.url) { needsManual.push(photo); continue }
       try {
+        const { data: { user } } = await supabase.auth.getUser()
         const ocrRes = await fetch('/api/ocr-phase', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ imageUrl: photo.url }),
+          body: JSON.stringify({ imageUrl: photo.url, userId: user?.id }),
         })
         const ocrData = await ocrRes.json()
         if (ocrData.phase) {

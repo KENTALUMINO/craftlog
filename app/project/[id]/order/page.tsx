@@ -70,6 +70,7 @@ export default function OrderPage() {
   const [catOrders, setCatOrders] = useState<Record<string, string[]>>({})
   const [mode, setMode] = useState<'organize' | 'order'>('organize')
   const [saving, setSaving] = useState(false)
+  const [normalizing, setNormalizing] = useState(false)
 
   // 工程名の変更
   const [renamingPhase, setRenamingPhase] = useState<string | null>(null)
@@ -122,6 +123,46 @@ export default function OrderPage() {
 
   const categorizedSet = new Set(categories.flatMap(c => c.phases))
   const uncategorized = allPhases.filter(p => !categorizedSet.has(p))
+
+  // AI自動整理
+  const handleNormalize = async () => {
+    if (!confirm('AIが工程名を自動で整理します。\n似た名前をまとめ、案件名・場所名を削除します。\n\nよろしいですか？')) return
+    setNormalizing(true)
+    try {
+      const res = await fetch('/api/normalize-phases', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId: id }),
+      })
+      const data = await res.json()
+      if (data.error) { alert('エラー：' + data.error); return }
+
+      // 画面のデータを更新（リロードせずに反映）
+      const mapping: Record<string, string> = data.mapping
+      setAllPhases(prev => {
+        const renamed = prev.map(p => mapping[p] ?? p)
+        return [...new Set(renamed)]
+      })
+      setCategories(prev => prev.map(c => ({ ...c, phases: [...new Set(c.phases.map(p => mapping[p] ?? p))] })))
+      setCatOrders(prev => {
+        const n: Record<string, string[]> = {}
+        for (const k in prev) n[k] = [...new Set(prev[k].map(p => mapping[p] ?? p))]
+        return n
+      })
+      setUncatOrdered(prev => [...new Set(prev.map(p => mapping[p] ?? p))])
+      setPhotosByPhase(prev => {
+        const n: Record<string, string[]> = {}
+        for (const [phase, paths] of Object.entries(prev)) {
+          const newPhase = mapping[phase] ?? phase
+          n[newPhase] = [...(n[newPhase] ?? []), ...paths]
+        }
+        return n
+      })
+      alert(`完了！${data.updatedCount}件の工程名を整理しました。`)
+    } finally {
+      setNormalizing(false)
+    }
+  }
 
   // ---- 整理モード操作 ----
 
@@ -262,6 +303,11 @@ export default function OrderPage() {
         {/* ========== 整理モード ========== */}
         {mode === 'organize' && (
           <>
+            <button onClick={handleNormalize} disabled={normalizing}
+              className="w-full py-3 rounded-xl text-sm font-bold flex items-center justify-center gap-2"
+              style={{ background: 'var(--cl-navy, #1f2a44)', color: '#fff' }}>
+              {normalizing ? '整理中...' : '✨ AIで工程名を自動整理する'}
+            </button>
             <p className="text-xs" style={{ color: 'var(--cl-text-muted)' }}>
               工程名を変えたり、カテゴリーにまとめたりできます。
             </p>

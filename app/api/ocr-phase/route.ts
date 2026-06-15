@@ -1,11 +1,29 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
+import { createClient } from '@supabase/supabase-js'
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SECRET_KEY!
+)
 
 export async function POST(req: NextRequest) {
   try {
-    const { imageUrl } = await req.json()
+    const { imageUrl, userId } = await req.json()
+
+    // 標準工程名リストを取得
+    let standardPhases: string[] = []
+    if (userId) {
+      const { data: company } = await supabase
+        .from('companies')
+        .select('standard_phases')
+        .eq('user_id', userId)
+        .single()
+      if (company?.standard_phases && Array.isArray(company.standard_phases)) {
+        standardPhases = company.standard_phases
+      }
+    }
 
     // 画像をfetchしてbase64に変換
     const imageRes = await fetch(imageUrl)
@@ -25,7 +43,18 @@ export async function POST(req: NextRequest) {
           },
           {
             type: 'text',
-            text: `この写真に工事黒板（デジタル黒板含む）が写っている場合、「工程名・作業名」だけを抽出してください。
+            text: standardPhases.length > 0
+              ? `この写真に工事黒板（デジタル黒板含む）が写っている場合、以下の【標準工程名リスト】の中から最も近いものを選んでください。
+
+【標準工程名リスト】
+${standardPhases.join('\n')}
+
+【選び方のルール】
+- 黒板の作業内容がリストのどれかと同じなら、リストの名前をそのまま返す
+- リストにない作業なら、黒板から作業名のみを短く抽出する（案件名・場所名・会社名・日付は除く）
+- 黒板がない場合は「なし」とだけ返す
+- 工程名のみを返す。説明文不要。`
+              : `この写真に工事黒板（デジタル黒板含む）が写っている場合、「工程名・作業名」だけを抽出してください。
 
 【絶対に含めないもの】
 - 工事名・案件名（例：第2ファミーレマンション改修工事）
