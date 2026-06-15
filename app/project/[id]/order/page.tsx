@@ -148,9 +148,12 @@ export default function OrderPage() {
               const cat = autoCats.find(c => c.name === primaryEntry[0])
               if (cat) cat.phases.push(phase)
             }
-            setCategories(autoCats)
+            // 工程が1つも割り当てられなかったカテゴリーは除外する
+            const filteredCats = autoCats.filter(c => c.phases.length > 0)
+            setCategories(filteredCats)
+            // 順番は空にする（ユーザーが「②順番を決める」タブで自分でタップして決める）
             const initialCatOrders: Record<string, string[]> = {}
-            for (const c of autoCats) initialCatOrders[c.id] = c.phases
+            for (const c of filteredCats) initialCatOrders[c.id] = []
             setCatOrders(initialCatOrders)
           }
         }
