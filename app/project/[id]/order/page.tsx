@@ -332,7 +332,7 @@ export default function OrderPage() {
                   )}
                 </div>
                 {/* カテゴリー内の工程 */}
-                <div className="divide-y" style={{ divideColor: 'var(--cl-border)' }}>
+                <div className="divide-y" style={{ borderColor: 'var(--cl-border)' }}>
                   {cat.phases.length === 0 && (
                     <p className="text-xs px-4 py-3" style={{ color: 'var(--cl-text-muted)' }}>
                       まだ工程がありません。未分類の工程から「📁 移動」で追加してください。
