@@ -19,11 +19,13 @@ export default function OnboardingPage() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
 
-    const { data: existing } = await supabase
+    const { data: existing, error: selectError } = await supabase
       .from('companies')
       .select('id')
       .eq('user_id', user.id)
       .single()
+
+    alert(`SELECT結果: existing=${JSON.stringify(existing)}, error=${JSON.stringify(selectError)}`)
 
     const payload = {
       company_name: form.company_name,
@@ -34,9 +36,13 @@ export default function OnboardingPage() {
     }
 
     if (existing) {
-      await supabase.from('companies').update(payload).eq('id', existing.id)
+      const { error } = await supabase.from('companies').update(payload).eq('user_id', user.id)
+      alert(`UPDATE error: ${JSON.stringify(error)}`)
+      if (error) { setSaving(false); return }
     } else {
-      await supabase.from('companies').insert(payload)
+      const { error } = await supabase.from('companies').insert(payload)
+      alert(`INSERT error: ${JSON.stringify(error)}`)
+      if (error) { setSaving(false); return }
     }
 
     setSaving(false)
