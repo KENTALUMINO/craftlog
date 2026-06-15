@@ -146,10 +146,10 @@ export default function SettingsPage() {
 
           <div className="bg-white rounded-2xl border border-gray-100 p-5 space-y-4">
             <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">完工報告書の送信先</h2>
-            <p className="text-xs text-gray-400">完工報告書を送るお客様のメールアドレスを、案件ごとに上書きできます。ここに入力した場合はデフォルトの送信先になります。</p>
+            <p className="text-xs text-gray-400">完工報告書は登録メールアドレスに必ず届きます。お客様にも送りたい場合はここにメールアドレスを入力してください。</p>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">送信先メールアドレス</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">お客様のメールアドレス（任意）</label>
               <input
                 type="email"
                 value={form.report_email}
