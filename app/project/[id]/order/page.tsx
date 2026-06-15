@@ -36,12 +36,17 @@ const StepBar = ({ current }: { current: number }) => (
 )
 
 // 工程の写真サムネイルを横並びで表示するコンポーネント
-const PhaseThumbs = ({ paths, getUrl }: { paths: string[]; getUrl: (p: string) => string }) => (
+const PhaseThumbs = ({ paths, getUrl, onClickPhoto }: {
+  paths: string[]
+  getUrl: (p: string) => string
+  onClickPhoto: (url: string) => void
+}) => (
   <div className="flex gap-1.5 mt-2 overflow-x-auto pb-1">
     {paths.slice(0, 5).map((path, i) => (
       // eslint-disable-next-line @next/next/no-img-element
       <img key={i} src={getUrl(path)} alt=""
-        className="w-16 h-12 object-cover rounded flex-shrink-0"
+        onClick={e => { e.stopPropagation(); onClickPhoto(getUrl(path)) }}
+        className="w-16 h-12 object-cover rounded flex-shrink-0 cursor-pointer"
         style={{ border: '1px solid var(--cl-border)' }} />
     ))}
     {paths.length > 5 && (
@@ -71,6 +76,7 @@ export default function OrderPage() {
   const [mode, setMode] = useState<'organize' | 'order'>('organize')
   const [saving, setSaving] = useState(false)
   const [normalizing, setNormalizing] = useState(false)
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null)
 
   // 工程名の変更
   const [renamingPhase, setRenamingPhase] = useState<string | null>(null)
@@ -368,7 +374,7 @@ export default function OrderPage() {
                           )}
                         </div>
                         {photosByPhase[phase] && (
-                          <PhaseThumbs paths={photosByPhase[phase]} getUrl={getThumbUrl} />
+                          <PhaseThumbs paths={photosByPhase[phase]} getUrl={getThumbUrl} onClickPhoto={setLightboxUrl} />
                         )}
                       </>
                     )}
@@ -593,6 +599,27 @@ export default function OrderPage() {
           </>
         )}
       </main>
+
+      {/* 写真拡大表示（ライトボックス） */}
+      {lightboxUrl && (
+        <div
+          className="fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-4"
+          onClick={() => setLightboxUrl(null)}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={lightboxUrl}
+            alt=""
+            className="max-w-full max-h-full rounded-xl object-contain"
+            onClick={e => e.stopPropagation()}
+          />
+          <button
+            onClick={() => setLightboxUrl(null)}
+            className="absolute top-4 right-4 w-10 h-10 rounded-full flex items-center justify-center text-white text-xl font-bold"
+            style={{ background: 'rgba(255,255,255,0.2)' }}>
+            ✕
+          </button>
+        </div>
+      )}
 
       {/* カテゴリー割り当てモーダル */}
       {assigningPhase && (
