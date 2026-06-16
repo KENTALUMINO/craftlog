@@ -301,8 +301,11 @@ export default function OrderPage() {
 
   const handleSave = async () => {
     setSaving(true)
-    // categories の phases を catOrders（順番つき）で上書きして保存
-    const finalCategories = categories.map(c => ({ ...c, phases: catOrders[c.id] ?? c.phases }))
+    // catOrdersに順番が設定されていればそれを使い、未設定ならc.phases（整理モードの並び）をそのまま使う
+    const finalCategories = categories.map(c => ({
+      ...c,
+      phases: (catOrders[c.id] ?? []).length > 0 ? catOrders[c.id] : c.phases,
+    }))
     await supabase.from('projects').update({
       phase_order: uncatOrdered,
       phase_categories: finalCategories,

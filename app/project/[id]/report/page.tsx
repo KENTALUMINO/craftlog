@@ -4,7 +4,8 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter, useParams } from 'next/navigation'
 
-type Project = { id: string; case_name: string; work_type: string; area: string; phase_order: string[] | null }
+type Category = { id: string; name: string; phases: string[] }
+type Project = { id: string; case_name: string; work_type: string; area: string; phase_order: string[] | null; phase_categories: Category[] | null }
 
 const STEPS = ['工程管理', '並び替え', '完工報告書', 'ブログ']
 
@@ -36,6 +37,7 @@ export default function ReportPage() {
   const [project, setProject] = useState<Project | null>(null)
   const [generating, setGenerating] = useState(false)
   const [reportSent, setReportSent] = useState(false)
+  const [reportError, setReportError] = useState('')
   const [photoCount, setPhotoCount] = useState(0)
   const [surveyCopied, setSurveyCopied] = useState(false)
 
@@ -62,15 +64,25 @@ export default function ReportPage() {
   const handleSend = async () => {
     if (!project) return
     setGenerating(true)
+    setReportError('')
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
-    const res = await fetch('/api/generate-report', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ projectId: id, userEmail: user.email }),
-    })
+    try {
+      const res = await fetch('/api/generate-report', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId: id, userEmail: user.email }),
+      })
+      const data = await res.json()
+      if (res.ok && data.success) {
+        setReportSent(true)
+      } else {
+        setReportError(data.error ?? 'エラーが発生しました。もう一度お試しください。')
+      }
+    } catch {
+      setReportError('通信エラーが発生しました。もう一度お試しください。')
+    }
     setGenerating(false)
-    if (res.ok) setReportSent(true)
   }
 
   if (!project) return (
@@ -104,7 +116,7 @@ export default function ReportPage() {
               { label: '現場名', value: project.case_name },
               { label: '工事種類', value: project.work_type },
               { label: '地域', value: project.area },
-              { label: '工程数', value: `${project.phase_order?.length ?? 0}工程` },
+              { label: '工程数', value: `${(project.phase_categories?.flatMap(c => c.phases).length ?? 0) + (project.phase_order?.length ?? 0)}工程` },
               { label: '写真枚数', value: `${photoCount}枚` },
             ].map(({ label, value }, i, arr) => (
               <div key={label} className="flex justify-between py-2.5"
@@ -152,9 +164,20 @@ export default function ReportPage() {
               ✓ 完工報告書をメールで送信しました
             </div>
           ) : (
-            <button onClick={handleSend} disabled={generating} className="cl-btn-orange">
-              {generating ? '生成中...' : '完工報告書を生成・メール送信'}
-            </button>
+            <>
+              {photoCount > 60 && !generating && (
+                <p className="text-xs mb-3 px-3 py-2 rounded-lg"
+                  style={{ background: '#fff3cd', color: '#856404' }}>
+                  ⚠ 写真が{photoCount}枚あります。PDFが大きくなるためメール送信に時間がかかる場合があります。
+                </p>
+              )}
+              <button onClick={handleSend} disabled={generating} className="cl-btn-orange">
+                {generating ? 'PDF生成中...（写真が多い場合は数分かかります）' : '完工報告書を生成・メール送信'}
+              </button>
+              {reportError && (
+                <p className="text-xs mt-2 text-center" style={{ color: '#dc2626' }}>{reportError}</p>
+              )}
+            </>
           )}
         </div>
 

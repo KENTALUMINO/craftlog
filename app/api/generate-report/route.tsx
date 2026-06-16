@@ -74,19 +74,30 @@ export async function POST(req: NextRequest) {
     ]
     const orderedPhases = [...categorizedPhases, ...uncategorizedPhases]
 
-    // 複数工程をbin-packingで1ページに詰め込む（合計6枚以内）
-    // 7枚以上の工程は6枚ずつ分割してから詰め込む
+    // 写真が多い場合はPDFサイズを抑えるため1工程あたり最大4枚に制限
+    const MAX_PHOTOS_PER_PHASE = 4
+    const totalPhotosInPdf = orderedPhases.reduce((sum, p) => sum + Math.min(grouped[p]?.length ?? 0, MAX_PHOTOS_PER_PHASE), 0)
+    // 全体でも最大80枚に制限（Resend 40MB制限対策）
+    const MAX_TOTAL_PHOTOS = 80
+
+    // 複数工程をbin-packingで1ページに詰め込む（合計4枚以内）
     type PhaseChunk = { phase: string; photos: typeof photos; chunkNum: number; totalChunks: number }
     type PageGroup = { phases: PhaseChunk[]; totalPhotos: number }
 
     const allChunks: PhaseChunk[] = []
+    let totalAdded = 0
     for (const phase of orderedPhases) {
-      const phasePhotos = grouped[phase]
-      const totalChunks = Math.ceil(phasePhotos.length / 4)
-      for (let i = 0; i < phasePhotos.length; i += 4) {
-        allChunks.push({ phase, photos: phasePhotos.slice(i, i + 4), chunkNum: Math.floor(i / 4) + 1, totalChunks })
+      if (totalAdded >= MAX_TOTAL_PHOTOS) break
+      const phasePhotos = grouped[phase].slice(0, MAX_PHOTOS_PER_PHASE)
+      const remaining = Math.min(phasePhotos.length, MAX_TOTAL_PHOTOS - totalAdded)
+      const limitedPhotos = phasePhotos.slice(0, remaining)
+      const totalChunks = Math.ceil(limitedPhotos.length / 4)
+      for (let i = 0; i < limitedPhotos.length; i += 4) {
+        allChunks.push({ phase, photos: limitedPhotos.slice(i, i + 4), chunkNum: Math.floor(i / 4) + 1, totalChunks })
       }
+      totalAdded += limitedPhotos.length
     }
+    void totalPhotosInPdf // suppress unused warning
 
     const pageGroups: PageGroup[] = []
     let currentGroup: PageGroup = { phases: [], totalPhotos: 0 }
@@ -223,7 +234,7 @@ export async function POST(req: NextRequest) {
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://craftlog.jp'
     const surveyUrl = `${siteUrl}/survey/${projectId}`
 
-    await resend.emails.send({
+    const { error: sendError } = await resend.emails.send({
       from: 'noreply@craftlog.jp',
       to: toAddresses,
       subject: `【完工報告書】${project.case_name} ${project.work_type}`,
@@ -238,6 +249,11 @@ export async function POST(req: NextRequest) {
         content: pdfBuffer,
       }],
     })
+
+    if (sendError) {
+      console.error('Resend error:', sendError)
+      return NextResponse.json({ error: `メール送信に失敗しました: ${sendError.message}` }, { status: 500 })
+    }
 
     return NextResponse.json({ success: true })
   } catch (error) {
