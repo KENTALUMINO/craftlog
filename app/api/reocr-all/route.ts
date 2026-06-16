@@ -10,7 +10,7 @@ const supabase = createClient(
 
 export async function POST(req: NextRequest) {
   try {
-    const { imageUrl, userId } = await req.json()
+    const { projectId, userId } = await req.json()
 
     // 標準工程名リストを取得
     let standardPhases: string[] = []
@@ -25,29 +25,44 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 画像をfetchしてbase64に変換
-    const imageRes = await fetch(imageUrl)
-    const arrayBuffer = await imageRes.arrayBuffer()
-    const base64 = Buffer.from(arrayBuffer).toString('base64')
-    const contentType = imageRes.headers.get('content-type') || 'image/jpeg'
-
     const standardPhasesText = standardPhases.length > 0
       ? `\n\n【標準工程名リスト】（phaseはこの中から最も近いものを選ぶ）\n${standardPhases.join('\n')}`
       : ''
 
-    const response = await client.messages.create({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 150,
-      messages: [{
-        role: 'user',
-        content: [
-          {
-            type: 'image',
-            source: { type: 'base64', media_type: contentType as 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp', data: base64 },
-          },
-          {
-            type: 'text',
-            text: `この写真に工事黒板（デジタル黒板含む）が写っている場合、以下の2つを読み取ってください。${standardPhasesText}
+    // 対象プロジェクトの全写真を取得
+    const { data: photos } = await supabase
+      .from('photos')
+      .select('id, storage_path')
+      .eq('project_id', projectId)
+
+    if (!photos || photos.length === 0) {
+      return NextResponse.json({ updated: 0 })
+    }
+
+    const baseUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/photos/`
+    let updated = 0
+
+    for (const photo of photos) {
+      try {
+        const imageUrl = baseUrl + photo.storage_path
+        const imageRes = await fetch(imageUrl)
+        const arrayBuffer = await imageRes.arrayBuffer()
+        const base64 = Buffer.from(arrayBuffer).toString('base64')
+        const contentType = imageRes.headers.get('content-type') || 'image/jpeg'
+
+        const response = await client.messages.create({
+          model: 'claude-haiku-4-5-20251001',
+          max_tokens: 150,
+          messages: [{
+            role: 'user',
+            content: [
+              {
+                type: 'image',
+                source: { type: 'base64', media_type: contentType as 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp', data: base64 },
+              },
+              {
+                type: 'text',
+                text: `この写真に工事黒板（デジタル黒板含む）が写っている場合、以下の2つを読み取ってください。${standardPhasesText}
 
 【読み取る項目】
 
@@ -70,32 +85,33 @@ export async function POST(req: NextRequest) {
 JSONのみ返してください。説明文不要。
 
 返す形式: {"category": "防水工事", "phase": "プライマー塗布"}`,
-          },
-        ],
-      }],
-    })
-
-    const text = response.content[0].type === 'text' ? response.content[0].text.trim() : ''
-
-    try {
-      const jsonMatch = text.match(/\{[\s\S]*\}/)
-      if (jsonMatch) {
-        const parsed = JSON.parse(jsonMatch[0])
-        return NextResponse.json({
-          phase: parsed.phase ?? null,
-          category: parsed.category ?? null,
+              },
+            ],
+          }],
         })
+
+        const text = response.content[0].type === 'text' ? response.content[0].text.trim() : ''
+        const jsonMatch = text.match(/\{[\s\S]*\}/)
+        if (jsonMatch) {
+          const parsed = JSON.parse(jsonMatch[0])
+          const newPhase = parsed.phase ?? null
+          const newCategory = parsed.category ?? null
+
+          await supabase.from('photos').update({
+            phase: newPhase,
+            phase_category: newCategory,
+          }).eq('id', photo.id)
+
+          updated++
+        }
+      } catch {
+        // 1枚失敗してもスキップして続行
       }
-    } catch {
-      // JSON解析失敗時はテキストをそのままphaseとして使う
     }
 
-    // フォールバック：旧形式（テキストのみ）
-    const phase = text === 'なし' || !text ? null : text
-    return NextResponse.json({ phase, category: null })
-
+    return NextResponse.json({ updated, total: photos.length })
   } catch (error) {
     console.error(error)
-    return NextResponse.json({ phase: null, category: null })
+    return NextResponse.json({ error: 'エラーが発生しました' }, { status: 500 })
   }
 }

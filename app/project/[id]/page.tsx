@@ -50,6 +50,7 @@ export default function ProjectPage() {
   const [reanalyzePhaseInput, setReanalyzePhaseInput] = useState('')
   const [reanalyzeCurrentIndex, setReanalyzeCurrentIndex] = useState(0)
   const [reanalyzeSuggestion, setReanalyzeSuggestion] = useState<string | null>(null)
+  const [reOcrProgress, setReOcrProgress] = useState<{ done: number; total: number } | null>(null)
 
   useEffect(() => {
     const init = async () => {
@@ -190,6 +191,22 @@ export default function ProjectPage() {
       setReanalyzePhaseInput('')
       setShowReanalyzeInput(true)
     }
+  }
+
+  const handleReOcrAll = async () => {
+    if (!confirm(`全${photos.length}枚の写真を再分析します。\n工程名とカテゴリーが上書きされます。よろしいですか？`)) return
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    setReOcrProgress({ done: 0, total: photos.length })
+    const res = await fetch('/api/reocr-all', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ projectId: id, userId: user.id }),
+    })
+    const data = await res.json()
+    setReOcrProgress({ done: data.updated ?? 0, total: photos.length })
+    await fetchPhotos()
+    setTimeout(() => setReOcrProgress(null), 3000)
   }
 
   const handleReanalyzeAssign = async (phase: string) => {
@@ -410,6 +427,32 @@ export default function ProjectPage() {
             style={{ background: 'var(--cl-navy, #1f2a44)', color: '#fff', opacity: reanalyzing ? 0.6 : 1 }}>
             🔍 未分類の写真をAIで再分析する（{photos.filter(p => !p.phase).length}枚）
           </button>
+        )}
+
+        {/* 全写真を再分類ボタン（カテゴリー精度が悪い場合に使う） */}
+        {photos.length > 0 && !uploading && !ocrLoading && !reanalyzing && !reOcrProgress && (
+          <button
+            onClick={handleReOcrAll}
+            className="w-full py-2.5 rounded-xl text-xs font-medium flex items-center justify-center gap-2 mb-4"
+            style={{ background: 'var(--cl-bg)', color: 'var(--cl-text-muted)', border: '1px solid var(--cl-border)' }}>
+            ↺ カテゴリーが違う場合：全写真を再分類する
+          </button>
+        )}
+
+        {/* 再分類中・完了表示 */}
+        {reOcrProgress && (
+          <div className="cl-card p-4 mb-4 text-center">
+            {reOcrProgress.done < reOcrProgress.total ? (
+              <>
+                <p className="text-sm font-medium mb-1" style={{ color: 'var(--cl-text)' }}>再分類中...</p>
+                <p className="text-xs" style={{ color: 'var(--cl-text-muted)' }}>黒板を読み取って工事種類を再判定しています</p>
+              </>
+            ) : (
+              <p className="text-sm font-medium" style={{ color: 'var(--cl-green)' }}>
+                ✓ {reOcrProgress.done}枚の再分類が完了しました
+              </p>
+            )}
+          </div>
         )}
 
         {/* アップロード進捗 */}
