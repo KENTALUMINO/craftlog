@@ -74,42 +74,28 @@ export async function POST(req: NextRequest) {
     ]
     const orderedPhases = [...categorizedPhases, ...uncategorizedPhases]
 
-    // 写真が多い場合はPDFサイズを抑えるため1工程あたり最大4枚に制限
-    const MAX_PHOTOS_PER_PHASE = 4
-    const totalPhotosInPdf = orderedPhases.reduce((sum, p) => sum + Math.min(grouped[p]?.length ?? 0, MAX_PHOTOS_PER_PHASE), 0)
-    // 全体でも最大80枚に制限（Resend 40MB制限対策）
+    // 全体で最大80枚に制限（Resend 40MB制限対策）
     const MAX_TOTAL_PHOTOS = 80
-
-    // 複数工程をbin-packingで1ページに詰め込む（合計4枚以内）
-    type PhaseChunk = { phase: string; photos: typeof photos; chunkNum: number; totalChunks: number }
-    type PageGroup = { phases: PhaseChunk[]; totalPhotos: number }
-
-    const allChunks: PhaseChunk[] = []
     let totalAdded = 0
+    const phasePhotosMap: Record<string, typeof photos> = {}
     for (const phase of orderedPhases) {
       if (totalAdded >= MAX_TOTAL_PHOTOS) break
-      const phasePhotos = grouped[phase].slice(0, MAX_PHOTOS_PER_PHASE)
-      const remaining = Math.min(phasePhotos.length, MAX_TOTAL_PHOTOS - totalAdded)
-      const limitedPhotos = phasePhotos.slice(0, remaining)
-      const totalChunks = Math.ceil(limitedPhotos.length / 4)
-      for (let i = 0; i < limitedPhotos.length; i += 4) {
-        allChunks.push({ phase, photos: limitedPhotos.slice(i, i + 4), chunkNum: Math.floor(i / 4) + 1, totalChunks })
-      }
-      totalAdded += limitedPhotos.length
+      const remaining = MAX_TOTAL_PHOTOS - totalAdded
+      phasePhotosMap[phase] = (grouped[phase] ?? []).slice(0, remaining)
+      totalAdded += phasePhotosMap[phase].length
     }
-    void totalPhotosInPdf // suppress unused warning
+    const phasesInPdf = orderedPhases.filter(p => phasePhotosMap[p]?.length > 0)
 
-    const pageGroups: PageGroup[] = []
-    let currentGroup: PageGroup = { phases: [], totalPhotos: 0 }
-    for (const chunk of allChunks) {
-      if (currentGroup.totalPhotos + chunk.photos.length > 4 && currentGroup.totalPhotos > 0) {
-        pageGroups.push(currentGroup)
-        currentGroup = { phases: [], totalPhotos: 0 }
-      }
-      currentGroup.phases.push(chunk)
-      currentGroup.totalPhotos += chunk.photos.length
+    // カテゴリーヘッダーをどの工程で表示するか事前計算
+    let lastCat: string | null = null
+    const showCatHeader: Record<string, boolean> = {}
+    const phaseToCategory: Record<string, string | null> = {}
+    for (const phase of phasesInPdf) {
+      const cat = savedCategories.find((c: CategoryData) => c.phases.includes(phase))?.name ?? null
+      phaseToCategory[phase] = cat
+      showCatHeader[phase] = !!(cat && cat !== lastCat)
+      if (cat) lastCat = cat
     }
-    if (currentGroup.phases.length > 0) pageGroups.push(currentGroup)
 
     // 16:9横長固定レイアウト
     const GAP = 6
@@ -152,76 +138,61 @@ export async function POST(req: NextRequest) {
                   <Text style={styles.tableValue}>{project.start_date} 〜 {project.end_date || '未定'}</Text>
                 </View>
               )}
-              <View style={styles.tableRow}>
-                <Text style={styles.tableLabel}>工程数</Text>
-                <Text style={styles.tableValue}>{orderedPhases.length}工程</Text>
-              </View>
-              <View style={styles.tableRow}>
-                <Text style={styles.tableLabel}>写真枚数</Text>
-                <Text style={styles.tableValue}>{photos.length}枚</Text>
-              </View>
             </View>
           </View>
           <Text style={styles.footer}>本書は CraftLog により自動生成されました</Text>
         </Page>
 
-        {/* 施工写真ページ（複数工程をbin-packingで1ページに集約） */}
-        {pageGroups.map((pg, i) => {
-          // このページグループで表示する工程のカテゴリーヘッダーを判定
-          let lastCategoryName: string | null = null
-          return (
-            <Page key={i} size="A4" style={styles.page}>
-              <Text style={styles.sectionTitle}>施工写真</Text>
-              {pg.phases.map((pc, pi) => {
-                // このphaseが属するカテゴリーを探す
-                const belongsToCategory = savedCategories.find((c: CategoryData) => c.phases.includes(pc.phase))
-                const categoryName = belongsToCategory?.name ?? null
-
-                // カテゴリーが変わったときだけヘッダーを表示
-                const showCategoryHeader = categoryName && categoryName !== lastCategoryName
-                if (categoryName) lastCategoryName = categoryName
-
-                const label = `${pc.phase}${pc.totalChunks > 1 ? `（${pc.chunkNum}/${pc.totalChunks}）` : ''}　${grouped[pc.phase].length}枚`
-                const rows: (typeof photos)[] = []
-                for (let r = 0; r * 2 < pc.photos.length; r++) {
-                  rows.push(pc.photos.slice(r * 2, r * 2 + 2))
-                }
-                return (
-                  <View key={pi}>
-                    {showCategoryHeader && (
-                      <Text style={{
-                        fontSize: 13,
-                        fontFamily: 'NotoSansJP',
-                        fontWeight: 'bold',
-                        color: '#ffffff',
-                        backgroundColor: '#1f2a44',
-                        padding: '8 12',
-                        marginTop: pi > 0 ? 14 : 0,
-                        marginBottom: 4,
-                      }}>
-                        ▍ {categoryName}
-                      </Text>
-                    )}
-                    <Text style={styles.phaseTitle}>{label}</Text>
-                    <View style={{ flexDirection: 'column', gap: GAP, marginBottom: pi < pg.phases.length - 1 ? 10 : 0 }}>
-                      {rows.map((row, ri) => (
-                        <View key={ri} style={{ flexDirection: 'row', gap: GAP }}>
-                          {row.map((p) => (
-                            <Image
-                              key={p.id}
-                              src={getUrl(p.storage_path)}
-                              style={{ width: PHOTO_WIDTH, height: PHOTO_HEIGHT, objectFit: 'cover' }}
-                            />
-                          ))}
-                        </View>
+        {/* 施工写真ページ（1ページに全工程を流し込み、PDF側で自動改ページ） */}
+        <Page size="A4" style={styles.page}>
+          <Text style={styles.sectionTitle}>施工写真</Text>
+          {phasesInPdf.map((phase, pi) => {
+            const phasePhotos = phasePhotosMap[phase]
+            const rows: (typeof photos)[] = []
+            for (let r = 0; r * 2 < phasePhotos.length; r++) {
+              rows.push(phasePhotos.slice(r * 2, r * 2 + 2))
+            }
+            return (
+              <View key={pi} style={{ marginTop: pi > 0 ? 10 : 0 }}>
+                {/* カテゴリーヘッダー（変わったときだけ） */}
+                {showCatHeader[phase] && (
+                  <Text style={{
+                    fontSize: 13,
+                    fontFamily: 'NotoSansJP',
+                    fontWeight: 'bold',
+                    color: '#ffffff',
+                    backgroundColor: '#1f2a44',
+                    padding: '8 12',
+                    marginBottom: 4,
+                  }}>
+                    ▍ {phaseToCategory[phase]}
+                  </Text>
+                )}
+                {/* 工程タイトル＋1行目の写真をセットで（ページをまたがないよう wrap={false}） */}
+                <View wrap={false}>
+                  <Text style={styles.phaseTitle}>{phase}</Text>
+                  {rows[0] && (
+                    <View style={{ flexDirection: 'row', gap: GAP, marginBottom: GAP }}>
+                      {rows[0].map(p => (
+                        <Image key={p.id} src={getUrl(p.storage_path)}
+                          style={{ width: PHOTO_WIDTH, height: PHOTO_HEIGHT, objectFit: 'cover' }} />
                       ))}
                     </View>
+                  )}
+                </View>
+                {/* 2行目以降の写真（自然に流れる） */}
+                {rows.slice(1).map((row, ri) => (
+                  <View key={ri} style={{ flexDirection: 'row', gap: GAP, marginBottom: GAP }}>
+                    {row.map(p => (
+                      <Image key={p.id} src={getUrl(p.storage_path)}
+                        style={{ width: PHOTO_WIDTH, height: PHOTO_HEIGHT, objectFit: 'cover' }} />
+                    ))}
                   </View>
-                )
-              })}
-            </Page>
-          )
-        })}
+                ))}
+              </View>
+            )
+          })}
+        </Page>
       </Document>
     )
 
